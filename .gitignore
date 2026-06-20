@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+package-lock.json
+package.json
+
+# Bank statements (sensitive personal data)
+*.csv
+*.xls
+*.xlsx
+
+# OS
+.DS_Store
+Thumbs.db

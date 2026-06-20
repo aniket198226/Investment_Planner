@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Planner – Bank Statement Analyser</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <!-- ===== UPLOAD SCREEN ===== -->
+  <section id="upload-screen" class="screen">
+    <div class="hero">
+      <div class="hero-icon">📊</div>
+      <h1>Financial Planner</h1>
+      <p class="subtitle">Understand your money. Plan your retirement.</p>
+
+      <p class="home-desc">
+        Financial Planner is a browser-based, privacy-first tool that brings clarity to your finances.
+        Upload your bank statement to automatically classify transactions into income, expenses, EMIs,
+        and investments — then use the Investment Planner to project your corpus across 11 asset classes
+        using Indian market return assumptions. The planner models wealth growth through the accumulation
+        phase and shows exactly how long your savings will sustain you post-retirement, factoring in
+        inflation, income growth, and configurable EMI tenure.
+        <strong>All processing happens locally in your browser — your data never leaves your device.</strong>
+      </p>
+
+      <div class="home-options">
+        <div class="home-option-card" id="opt-upload-card">
+          <div class="home-option-icon">📊</div>
+          <h3 class="home-option-title">Upload Bank Statement</h3>
+          <p class="home-option-desc">Automatically detect income, expenses, EMIs, and investments from your CSV or Excel statement. Your numbers pre-fill the investment planner instantly.</p>
+          <button class="btn-outline home-option-btn" id="select-upload-btn">Upload Statement ↓</button>
+        </div>
+        <div class="home-option-card" id="opt-manual-card">
+          <div class="home-option-icon">✏️</div>
+          <h3 class="home-option-title">Manual Entry</h3>
+          <p class="home-option-desc">Skip the statement upload. Go straight to the Investment Planner and enter your annual income, expenses, EMI, and current corpus directly.</p>
+          <button class="btn-primary home-option-btn" id="manual-btn">Start Planning →</button>
+        </div>
+      </div>
+
+      <div id="upload-section" class="hidden">
+        <div class="upload-card" id="drop-zone">
+          <div class="upload-icon">⬆️</div>
+          <p class="upload-label">Drag &amp; drop your bank statement here</p>
+          <p class="upload-hint">CSV, XLS or XLSX · or click to browse</p>
+          <input type="file" id="file-input" accept=".csv,.xls,.xlsx" hidden />
+          <button class="btn-primary" id="browse-btn">Choose File</button>
+        </div>
+
+        <div class="format-guide">
+          <h3>Expected Columns (CSV / Excel)</h3>
+          <div class="columns-grid">
+            <span class="col-tag">Date</span>
+            <span class="col-tag">Description</span>
+            <span class="col-tag">Debit</span>
+            <span class="col-tag">Credit</span>
+            <span class="col-tag">Balance</span>
+          </div>
+          <p class="format-note">Columns are auto-detected. Common bank export formats are supported.</p>
+        </div>
+      </div>
+
+      <div id="upload-error" class="error-banner hidden"></div>
+    </div>
+  </section>
+
+  <!-- ===== DASHBOARD SCREEN ===== -->
+  <section id="dashboard-screen" class="screen hidden">
+    <header class="dash-header">
+      <div class="dash-brand">
+        <span class="dash-icon">📊</span>
+        <span class="dash-title">Financial Planner</span>
+      </div>
+      <div class="dash-meta" id="dash-meta"></div>
+      <button class="btn-primary" id="planner-btn">📈 Investment Plan</button>
+      <button class="btn-outline" id="reset-btn">Upload New Statement</button>
+    </header>
+
+    <!-- Summary Cards -->
+    <div class="summary-strip" id="summary-strip"></div>
+
+    <!-- Short Note -->
+    <div class="insight-card" id="insight-note"></div>
+
+    <!-- Chart + Cash Flow -->
+    <div class="main-grid">
+      <div class="card chart-card">
+        <h2 class="card-title">Money Flow Breakdown</h2>
+        <div class="chart-wrap">
+          <canvas id="pie-chart"></canvas>
+        </div>
+        <div id="chart-legend" class="custom-legend"></div>
+      </div>
+
+      <div class="card table-card">
+        <h2 class="card-title">Cash Flow Summary</h2>
+        <div class="table-wrap">
+          <table id="cashflow-table">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Opening Balance</th>
+                <th>Cash Inflow</th>
+                <th>Cash Outflow</th>
+                <th>Net Balance</th>
+              </tr>
+            </thead>
+            <tbody id="cashflow-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PLANNER SCREEN ===== -->
+  <section id="planner-screen" class="screen hidden">
+    <header class="dash-header">
+      <div class="dash-brand">
+        <span class="dash-icon">📈</span>
+        <span class="dash-title">Investment Planner</span>
+      </div>
+      <button class="btn-outline" id="planner-back-btn">← Back to Dashboard</button>
+    </header>
+
+    <div class="planner-body">
+
+      <!-- Statement snapshot -->
+      <div class="card">
+        <h2 class="card-title">Your Financial Snapshot (from Statement)</h2>
+        <div id="planner-statement-summary"></div>
+      </div>
+
+      <!-- Personal details + assumptions -->
+      <div class="planner-two-col">
+        <div class="card">
+          <h2 class="card-title">Personal Details</h2>
+          <div class="form-inline-grid">
+            <div class="form-row">
+              <label>Current Age</label>
+              <input type="number" id="p-current-age" class="form-input" min="18" max="79" value="35">
+            </div>
+            <div class="form-row">
+              <label>Retirement Age</label>
+              <input type="number" id="p-retirement-age" class="form-input" min="40" max="80" value="60">
+            </div>
+            <div class="form-row">
+              <label>Life Expectancy</label>
+              <input type="number" id="p-life-expectancy" class="form-input" min="60" max="100" value="80">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Growth Assumptions</h2>
+          <div class="form-inline-grid">
+            <div class="form-row">
+              <label>Income Growth (% p.a.)</label>
+              <input type="number" id="p-income-growth" class="form-input" min="0" max="30" step="0.5" value="9">
+            </div>
+            <div class="form-row">
+              <label>Inflation (% p.a.)</label>
+              <input type="number" id="p-inflation" class="form-input" min="0" max="20" step="0.5" value="9">
+            </div>
+            <div class="form-row">
+              <label>Investment % of Income</label>
+              <input type="number" id="p-invest-pct" class="form-input" min="0" max="100" step="0.5" value="10">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Corpus & returns table -->
+      <div class="card">
+        <h2 class="card-title">Current Corpus &amp; Asset Allocation</h2>
+        <p class="card-hint">Enter existing portfolio value in <strong>Current Value</strong>. <strong>New Annual Allocation</strong> is auto-filled from your invest % — edit per asset class as needed. Returns are earned on the combined total.</p>
+        <div class="table-wrap">
+          <table id="corpus-table">
+            <thead>
+              <tr>
+                <th>Asset Class</th>
+                <th class="num-col">Current Value (₹)</th>
+                <th class="num-col">New Annual Allocation (₹)</th>
+                <th class="num-col">Expected Return (% p.a.)</th>
+              </tr>
+            </thead>
+            <tbody id="corpus-tbody"></tbody>
+            <tfoot>
+              <tr>
+                <td><strong>Total &nbsp;/&nbsp; Weighted Avg Return</strong></td>
+                <td class="num-col" id="corpus-total-cell" style="font-weight:700">₹0</td>
+                <td class="num-col" id="alloc-total-cell" style="font-weight:700">₹0</td>
+                <td class="num-col" id="corpus-return-cell" style="font-weight:700">—</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Calculate -->
+      <div class="planner-actions">
+        <button class="btn-primary btn-large" id="calculate-btn">Calculate Retirement Projection →</button>
+      </div>
+
+      <!-- Projection output -->
+      <div id="projection-output" class="hidden projection-section">
+
+        <div class="card">
+          <h2 class="card-title">Accumulation Phase — Pre-Retirement</h2>
+          <div class="table-wrap">
+            <table style="table-layout:fixed;width:100%">
+              <colgroup>
+                <col style="width:70px">
+                <col style="width:55px">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:14%">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Age</th>
+                  <th class="num-col">Annual Income</th>
+                  <th class="num-col">Expenses + EMI</th>
+                  <th class="num-col">Investment Added</th>
+                  <th class="num-col">Returns on Corpus</th>
+                  <th class="num-col">Closing Corpus</th>
+                </tr>
+              </thead>
+              <tbody id="pre-retirement-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Drawdown Phase — Post-Retirement</h2>
+          <div class="table-wrap">
+            <table style="table-layout:fixed;width:100%">
+              <colgroup>
+                <col style="width:60px">
+                <col style="width:50px">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:14%">
+                <col style="width:90px">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  <th>Age</th>
+                  <th class="num-col">Opening Corpus</th>
+                  <th class="num-col">Annual Expenses</th>
+                  <th class="num-col">Returns on Balance</th>
+                  <th class="num-col">Closing Corpus</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="post-retirement-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
