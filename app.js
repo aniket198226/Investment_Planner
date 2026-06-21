@@ -819,7 +819,18 @@ function allocateEqually() {
   if (_investmentBlocked) _investmentBlocked = false;
   investPctInput.disabled = false;
 
-  const investPct  = parseFloat(investPctInput.value) || 0;
+  // Cap invest % to surplus available after expenses + EMI
+  const surplus    = income - expenses - emi;
+  const maxPct     = income > 0 ? (surplus / income) * 100 : 100;
+  investPctInput.max = maxPct.toFixed(1);
+
+  let investPct = parseFloat(investPctInput.value) || 0;
+  if (investPct > maxPct) {
+    investPct = parseFloat(maxPct.toFixed(1));
+    investPctInput.value = investPct;
+    showPlannerToast(`Investment capped at ${investPct.toFixed(1)}% — cannot exceed surplus after expenses & EMI.`);
+  }
+
   const totalInvest = income * (investPct / 100);
   const perAsset    = Math.round(totalInvest / ASSET_CLASSES.length);
   ASSET_CLASSES.forEach((a) => {
