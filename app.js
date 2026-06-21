@@ -747,9 +747,11 @@ function initPlanner() {
   attachFormattedInputHandlers('p-annual-expenses');
   attachFormattedInputHandlers('p-annual-emi');
 
-  // Re-allocate whenever invest % or annual income changes
+  // Re-allocate (and validate) whenever income, expenses, EMI, or invest % changes
   document.getElementById('p-invest-pct').addEventListener('input', allocateEqually);
   document.getElementById('p-annual-income')?.addEventListener('input', allocateEqually);
+  document.getElementById('p-annual-expenses')?.addEventListener('input', allocateEqually);
+  document.getElementById('p-annual-emi')?.addEventListener('input', allocateEqually);
 
   // Hide any previous projection
   document.getElementById('projection-output').classList.add('hidden');
@@ -789,17 +791,56 @@ function getAnnualEMI() {
   return parseFormattedInput('p-annual-emi') || (bankData?.monthlyEMI || 0) * 12;
 }
 
-function allocateEqually() {
-  const investPct   = parseFloat(document.getElementById('p-invest-pct').value) || 0;
-  const annualIncome = getAnnualIncome();
-  const totalInvest  = annualIncome * (investPct / 100);
-  const perAsset     = Math.round(totalInvest / ASSET_CLASSES.length);
+let _investmentBlocked = false;
 
+function allocateEqually() {
+  const investPctInput = document.getElementById('p-invest-pct');
+  const income   = getAnnualIncome();
+  const expenses = getAnnualExpenses();
+  const emi      = getAnnualEMI();
+
+  const blocked = income > 0 && (expenses + emi) >= income;
+
+  if (blocked) {
+    if (!_investmentBlocked) {
+      showPlannerToast('Expenses are more than Income. Additional Investment not possible.');
+      _investmentBlocked = true;
+    }
+    investPctInput.disabled = true;
+    investPctInput.value    = 0;
+    ASSET_CLASSES.forEach((a) => {
+      const inp = document.getElementById(`alloc-${a.key}`);
+      if (inp) inp.value = 0;
+    });
+    updateCorpusTotals();
+    return;
+  }
+
+  if (_investmentBlocked) _investmentBlocked = false;
+  investPctInput.disabled = false;
+
+  const investPct  = parseFloat(investPctInput.value) || 0;
+  const totalInvest = income * (investPct / 100);
+  const perAsset    = Math.round(totalInvest / ASSET_CLASSES.length);
   ASSET_CLASSES.forEach((a) => {
     const inp = document.getElementById(`alloc-${a.key}`);
     if (inp) inp.value = perAsset;
   });
   updateCorpusTotals();
+}
+
+function showPlannerToast(msg) {
+  let toast = document.getElementById('planner-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'planner-toast';
+    toast.className = 'planner-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('planner-toast--show');
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(() => toast.classList.remove('planner-toast--show'), 4500);
 }
 
 function renderPlannerSnapshot() {

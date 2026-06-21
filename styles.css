@@ -576,3 +576,33 @@ tfoot td {
   font-size: .8rem;
   font-weight: 600;
 }
+
+/* Disabled form input */
+.form-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Toast notification */
+.planner-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: #ff4060;
+  color: #fff;
+  padding: 13px 28px;
+  border-radius: 10px;
+  font-size: .9rem;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s ease, transform .3s ease;
+  z-index: 9999;
+  white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+}
+.planner-toast--show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
