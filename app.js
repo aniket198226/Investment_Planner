@@ -92,24 +92,77 @@ const COL_MAP = {
   ],
 };
 
-// ===== ASSET CLASSES (Indian market 5-yr historical avg returns) =====
+// ===== ASSET CLASSES — full Indian investment universe =====
+// Returns are illustrative long-run assumptions; all are editable by the user.
 const ASSET_CLASSES = [
-  { key: 'equity_large',  label: 'Large Cap',   category: 'Direct Equity', defaultReturn: 14   },
-  { key: 'equity_mid',    label: 'Mid Cap',      category: 'Direct Equity', defaultReturn: 18   },
-  { key: 'equity_small',  label: 'Small Cap',    category: 'Direct Equity', defaultReturn: 22   },
-  { key: 'mf_large',      label: 'Large Cap',    category: 'Mutual Funds',  defaultReturn: 13   },
-  { key: 'mf_mid',        label: 'Mid Cap',      category: 'Mutual Funds',  defaultReturn: 17   },
-  { key: 'mf_small',      label: 'Small Cap',    category: 'Mutual Funds',  defaultReturn: 20   },
-  { key: 'mf_flexi',      label: 'Flexi Cap',    category: 'Mutual Funds',  defaultReturn: 15   },
-  { key: 'debt_mf',       label: 'Debt MF',      category: 'Debt Funds',    defaultReturn: 7.5  },
-  { key: 'debt_pf',       label: 'PF / EPF',     category: 'Debt Funds',    defaultReturn: 8.1  },
-  { key: 'crypto_top10',  label: 'Top 10 Coins', category: 'Crypto',        defaultReturn: 35   },
-  { key: 'crypto_others', label: 'Others',       category: 'Crypto',        defaultReturn: 20   },
+  // Direct Equity
+  { key: 'eq_large',       label: 'Large Cap Stocks',           category: 'Direct Equity',          defaultReturn: 12,   risk: 'High'      },
+  { key: 'eq_mid',         label: 'Mid Cap Stocks',             category: 'Direct Equity',          defaultReturn: 16,   risk: 'High'      },
+  { key: 'eq_small',       label: 'Small Cap Stocks',           category: 'Direct Equity',          defaultReturn: 20,   risk: 'Very High' },
+  { key: 'eq_micro',       label: 'Micro Cap Stocks',           category: 'Direct Equity',          defaultReturn: 24,   risk: 'Very High' },
+  // Equity Mutual Funds
+  { key: 'mf_large',       label: 'Large Cap Fund',             category: 'Equity Mutual Funds',    defaultReturn: 11,   risk: 'High'      },
+  { key: 'mf_mid',         label: 'Mid Cap Fund',               category: 'Equity Mutual Funds',    defaultReturn: 15,   risk: 'High'      },
+  { key: 'mf_small',       label: 'Small Cap Fund',             category: 'Equity Mutual Funds',    defaultReturn: 18,   risk: 'Very High' },
+  { key: 'mf_flexi',       label: 'Flexi Cap / Multi Cap',      category: 'Equity Mutual Funds',    defaultReturn: 13,   risk: 'High'      },
+  { key: 'mf_largmid',     label: 'Large & Mid Cap Fund',       category: 'Equity Mutual Funds',    defaultReturn: 13,   risk: 'High'      },
+  { key: 'mf_elss',        label: 'ELSS (Tax Saving)',          category: 'Equity Mutual Funds',    defaultReturn: 13,   risk: 'High'      },
+  { key: 'mf_index',       label: 'Index Fund (Nifty 50)',      category: 'Equity Mutual Funds',    defaultReturn: 12,   risk: 'High'      },
+  { key: 'mf_intl',        label: 'International / Global',     category: 'Equity Mutual Funds',    defaultReturn: 11,   risk: 'High'      },
+  { key: 'mf_sectoral',    label: 'Sectoral / Thematic',        category: 'Equity Mutual Funds',    defaultReturn: 14,   risk: 'Very High' },
+  // Debt / Guaranteed
+  { key: 'debt_ppf',       label: 'PPF',                        category: 'Debt / Guaranteed',      defaultReturn: 7.1,  risk: 'Very Low'  },
+  { key: 'debt_pf',        label: 'EPF / PF',                   category: 'Debt / Guaranteed',      defaultReturn: 8.1,  risk: 'Very Low'  },
+  { key: 'debt_nps_eq',    label: 'NPS — Equity (Tier I)',      category: 'Debt / Guaranteed',      defaultReturn: 11,   risk: 'Medium'    },
+  { key: 'debt_nps_d',     label: 'NPS — Debt (Tier I)',        category: 'Debt / Guaranteed',      defaultReturn: 8.5,  risk: 'Low'       },
+  { key: 'debt_ssy',       label: 'Sukanya Samriddhi Yojana',   category: 'Debt / Guaranteed',      defaultReturn: 8.2,  risk: 'Very Low'  },
+  { key: 'debt_scss',      label: 'Senior Citizen Savings',     category: 'Debt / Guaranteed',      defaultReturn: 8.2,  risk: 'Very Low'  },
+  { key: 'debt_rbi',       label: 'RBI Floating Rate Bonds',    category: 'Debt / Guaranteed',      defaultReturn: 8.05, risk: 'Very Low'  },
+  { key: 'debt_potd',      label: 'Post Office Time Deposit',   category: 'Debt / Guaranteed',      defaultReturn: 7.5,  risk: 'Very Low'  },
+  { key: 'fd_bank',        label: 'Bank Fixed Deposit',         category: 'Debt / Guaranteed',      defaultReturn: 7,    risk: 'Very Low'  },
+  { key: 'fd_corp',        label: 'Corporate Fixed Deposit',    category: 'Debt / Guaranteed',      defaultReturn: 8,    risk: 'Low'       },
+  { key: 'debt_gsec',      label: 'Government Securities',      category: 'Debt / Guaranteed',      defaultReturn: 7.3,  risk: 'Very Low'  },
+  // Debt Mutual Funds
+  { key: 'dmf_liquid',     label: 'Liquid Fund',                category: 'Debt Mutual Funds',      defaultReturn: 6.8,  risk: 'Very Low'  },
+  { key: 'dmf_ultrashort', label: 'Ultra Short Duration',       category: 'Debt Mutual Funds',      defaultReturn: 7.2,  risk: 'Very Low'  },
+  { key: 'dmf_short',      label: 'Short Duration Fund',        category: 'Debt Mutual Funds',      defaultReturn: 7.5,  risk: 'Low'       },
+  { key: 'dmf_corp',       label: 'Corporate Bond Fund',        category: 'Debt Mutual Funds',      defaultReturn: 8,    risk: 'Low'       },
+  { key: 'dmf_bpsu',       label: 'Banking & PSU Fund',         category: 'Debt Mutual Funds',      defaultReturn: 7.8,  risk: 'Low'       },
+  { key: 'dmf_gilt',       label: 'Gilt Fund',                  category: 'Debt Mutual Funds',      defaultReturn: 8,    risk: 'Low'       },
+  { key: 'dmf_credit',     label: 'Credit Risk Fund',           category: 'Debt Mutual Funds',      defaultReturn: 9,    risk: 'Medium'    },
+  { key: 'dmf_long',       label: 'Long Duration Fund',         category: 'Debt Mutual Funds',      defaultReturn: 8.5,  risk: 'Low'       },
+  // Real Estate
+  { key: 're_resi',        label: 'Residential Property',       category: 'Real Estate',            defaultReturn: 9,    risk: 'Medium'    },
+  { key: 're_comm',        label: 'Commercial Property',        category: 'Real Estate',            defaultReturn: 10,   risk: 'Medium'    },
+  { key: 're_reit',        label: 'REITs',                      category: 'Real Estate',            defaultReturn: 9,    risk: 'Medium'    },
+  { key: 're_invit',       label: 'InvITs',                     category: 'Real Estate',            defaultReturn: 9.5,  risk: 'Medium'    },
+  // Gold & Precious Metals
+  { key: 'gold_sgb',       label: 'Sovereign Gold Bond (SGB)',  category: 'Gold & Precious Metals', defaultReturn: 10,   risk: 'Medium'    },
+  { key: 'gold_etf',       label: 'Gold ETF',                   category: 'Gold & Precious Metals', defaultReturn: 9.5,  risk: 'Medium'    },
+  { key: 'gold_phys',      label: 'Physical Gold',              category: 'Gold & Precious Metals', defaultReturn: 9,    risk: 'Medium'    },
+  { key: 'silver',         label: 'Silver ETF / Physical',      category: 'Gold & Precious Metals', defaultReturn: 11,   risk: 'Medium'    },
+  // Crypto
+  { key: 'crypto_btc',     label: 'Bitcoin (BTC)',              category: 'Crypto',                 defaultReturn: 20,   risk: 'Extreme'   },
+  { key: 'crypto_eth',     label: 'Ethereum (ETH)',             category: 'Crypto',                 defaultReturn: 22,   risk: 'Extreme'   },
+  { key: 'crypto_top10',   label: 'Top 10 Altcoins',            category: 'Crypto',                 defaultReturn: 18,   risk: 'Extreme'   },
+  { key: 'crypto_others',  label: 'Other Altcoins',             category: 'Crypto',                 defaultReturn: 15,   risk: 'Extreme'   },
+  // Alternatives
+  { key: 'alt_p2p',        label: 'P2P Lending',                category: 'Alternatives',           defaultReturn: 11,   risk: 'High'      },
+  { key: 'alt_ulip',       label: 'ULIP (after charges)',        category: 'Alternatives',           defaultReturn: 9,    risk: 'Medium'    },
+  { key: 'alt_pms',        label: 'PMS / AIF',                  category: 'Alternatives',           defaultReturn: 14,   risk: 'High'      },
+  { key: 'alt_angel',      label: 'Angel / Startup Investing',  category: 'Alternatives',           defaultReturn: 20,   risk: 'Extreme'   },
+  { key: 'alt_preipo',     label: 'Unlisted / Pre-IPO Shares',  category: 'Alternatives',           defaultReturn: 18,   risk: 'Very High' },
 ];
 
 // ===== STATE =====
 let pieChart = null;
 let bankData  = null; // populated from bank statement analysis, consumed by planner
+
+// Asset classes the user has opted into (pre-seeded with 7 common ones)
+const DEFAULT_SELECTED_KEYS = new Set([
+  'mf_large', 'mf_mid', 'mf_flexi', 'debt_pf', 'debt_ppf', 'gold_sgb', 'fd_bank',
+]);
+let selectedAssetKeys = new Set([...DEFAULT_SELECTED_KEYS]);
 
 // ===== UTILS =====
 const fmt = (n) =>
@@ -732,6 +785,7 @@ function manualEntry() {
 // ===== INVESTMENT PLANNER =====
 
 function initPlanner() {
+  renderAssetSelector();
   renderCorpusTable();
   renderPlannerSnapshot();
 
@@ -808,7 +862,7 @@ function allocateEqually() {
     }
     investPctInput.disabled = true;
     investPctInput.value    = 0;
-    ASSET_CLASSES.forEach((a) => {
+    ASSET_CLASSES.filter(a => selectedAssetKeys.has(a.key)).forEach((a) => {
       const inp = document.getElementById(`alloc-${a.key}`);
       if (inp) inp.value = 0;
     });
@@ -831,9 +885,10 @@ function allocateEqually() {
     showPlannerToast(`Investment capped at ${investPct.toFixed(1)}% — cannot exceed surplus after expenses & EMI.`);
   }
 
-  const totalInvest = income * (investPct / 100);
-  const perAsset    = Math.round(totalInvest / ASSET_CLASSES.length);
-  ASSET_CLASSES.forEach((a) => {
+  const totalInvest  = income * (investPct / 100);
+  const selectedList = ASSET_CLASSES.filter(a => selectedAssetKeys.has(a.key));
+  const perAsset     = selectedList.length > 0 ? Math.round(totalInvest / selectedList.length) : 0;
+  selectedList.forEach((a) => {
     const inp = document.getElementById(`alloc-${a.key}`);
     if (inp) inp.value = perAsset;
   });
@@ -940,35 +995,122 @@ function renderPlannerSnapshot() {
   `;
 }
 
-function renderCorpusTable() {
-  const tbody = document.getElementById('corpus-tbody');
+// ===== ASSET SELECTOR =====
+const RISK_COLORS = {
+  'Very Low': '#00d4aa',
+  'Low':      '#6ab87a',
+  'Medium':   '#ffa94d',
+  'High':     '#ff7b6b',
+  'Very High':'#ff6584',
+  'Extreme':  '#d94040',
+};
+
+function renderAssetSelector() {
+  const panel = document.getElementById('asset-selector-panel');
+  if (!panel) return;
+
   const categories = [...new Set(ASSET_CLASSES.map(a => a.category))];
+  let html = '<div class="asset-selector-grid">';
+  categories.forEach((cat) => {
+    html += `<div class="asset-selector-category"><div class="asset-cat-header">${cat}</div>`;
+    ASSET_CLASSES.filter(a => a.category === cat).forEach((a) => {
+      const checked = selectedAssetKeys.has(a.key) ? 'checked' : '';
+      const color   = RISK_COLORS[a.risk] || '#8b90a7';
+      html += `<label class="asset-checkbox-row${checked ? ' asset-checkbox-row--checked' : ''}">
+        <input type="checkbox" data-key="${a.key}" ${checked}
+          onchange="toggleAssetClass('${a.key}', this.checked)">
+        <span class="asset-cb-label">${a.label}</span>
+        <span class="asset-risk-badge" style="color:${color};border-color:${color};background:${color}1a">${a.risk}</span>
+      </label>`;
+    });
+    html += '</div>';
+  });
+  html += '</div>';
+  panel.innerHTML = html;
+  updateSelectorCount();
+}
+
+function toggleAssetClass(key, checked) {
+  if (checked) selectedAssetKeys.add(key);
+  else         selectedAssetKeys.delete(key);
+  const label = document.querySelector(`.asset-checkbox-row input[data-key="${key}"]`)?.closest('label');
+  if (label) label.classList.toggle('asset-checkbox-row--checked', checked);
+  renderCorpusTable();
+  updateSelectorCount();
+  updateCorpusTotals();
+}
+
+function updateSelectorCount() {
+  const el = document.getElementById('asset-selector-count');
+  const n  = selectedAssetKeys.size;
+  if (el) el.textContent = `${n} asset class${n !== 1 ? 'es' : ''} selected`;
+}
+
+function toggleAssetSelectorPanel() {
+  const panel   = document.getElementById('asset-selector-panel');
+  const chevron = document.getElementById('selector-chevron');
+  if (!panel) return;
+  const closing = !panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', closing);
+  if (chevron) chevron.textContent = closing ? '▸' : '▾';
+}
+
+// ===== CORPUS TABLE =====
+function renderCorpusTable() {
+  // Snapshot existing input values so they survive a re-render
+  const saved = {};
+  ASSET_CLASSES.forEach((a) => {
+    const cur = document.getElementById(`corpus-${a.key}`);
+    const alc = document.getElementById(`alloc-${a.key}`);
+    const ret = document.getElementById(`return-${a.key}`);
+    if (cur || alc || ret) {
+      saved[a.key] = {
+        cur: cur?.value ?? '0',
+        alc: alc?.value ?? '0',
+        ret: ret?.value ?? String(a.defaultReturn),
+      };
+    }
+  });
+
+  const tbody    = document.getElementById('corpus-tbody');
+  const selected = ASSET_CLASSES.filter(a => selectedAssetKeys.has(a.key));
+  const cats     = [...new Set(selected.map(a => a.category))];
 
   let html = '';
-  categories.forEach((cat) => {
-    html += `<tr class="cat-row"><td colspan="4">${cat}</td></tr>`;
-    ASSET_CLASSES.filter(a => a.category === cat).forEach((a) => {
-      html += `
-        <tr>
-          <td style="padding-left:24px">${a.label}</td>
+  if (!selected.length) {
+    html = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:28px 16px">
+      No asset classes selected. Click <strong>"Choose your investments"</strong> above to add some.
+    </td></tr>`;
+  } else {
+    cats.forEach((cat) => {
+      html += `<tr class="cat-row"><td colspan="4">${cat}</td></tr>`;
+      selected.filter(a => a.category === cat).forEach((a) => {
+        const sv  = saved[a.key] || {};
+        const cur = sv.cur ?? '0';
+        const alc = sv.alc ?? '0';
+        const ret = sv.ret ?? String(a.defaultReturn);
+        const rColor = RISK_COLORS[a.risk] || '#8b90a7';
+        html += `<tr>
+          <td style="padding-left:24px">
+            ${a.label}
+            <span class="table-risk-dot" style="background:${rColor}" title="${a.risk} risk"></span>
+          </td>
           <td class="num-col">
             <input type="number" id="corpus-${a.key}" class="corpus-input"
-              min="0" step="1000" value="0" placeholder="0"
-              oninput="updateCorpusTotals()">
+              min="0" step="1000" value="${cur}" placeholder="0" oninput="updateCorpusTotals()">
           </td>
           <td class="num-col">
             <input type="number" id="alloc-${a.key}" class="corpus-input"
-              min="0" step="1000" value="0" placeholder="0"
-              oninput="updateCorpusTotals()">
+              min="0" step="1000" value="${alc}" placeholder="0" oninput="updateCorpusTotals()">
           </td>
           <td class="num-col">
             <input type="number" id="return-${a.key}" class="corpus-input return-input"
-              min="0" max="100" step="0.5" value="${a.defaultReturn}"
-              oninput="updateCorpusTotals()">%
+              min="0" max="200" step="0.5" value="${ret}" oninput="updateCorpusTotals()">%
           </td>
         </tr>`;
+      });
     });
-  });
+  }
   tbody.innerHTML = html;
 }
 
@@ -976,7 +1118,7 @@ function updateCorpusTotals() {
   let totalCurrent = 0;
   let totalAlloc   = 0;
   let weightedSum  = 0;
-  ASSET_CLASSES.forEach((a) => {
+  ASSET_CLASSES.filter(a => selectedAssetKeys.has(a.key)).forEach((a) => {
     const cur = parseFloat(document.getElementById(`corpus-${a.key}`)?.value) || 0;
     const alc = parseFloat(document.getElementById(`alloc-${a.key}`)?.value)  || 0;
     const ret = parseFloat(document.getElementById(`return-${a.key}`)?.value) || 0;
@@ -995,7 +1137,7 @@ function getCorpusInputs() {
   let totalCurrent = 0;
   let totalAlloc   = 0;
   let weightedSum  = 0;
-  ASSET_CLASSES.forEach((a) => {
+  ASSET_CLASSES.filter(a => selectedAssetKeys.has(a.key)).forEach((a) => {
     const cur = parseFloat(document.getElementById(`corpus-${a.key}`)?.value) || 0;
     const alc = parseFloat(document.getElementById(`alloc-${a.key}`)?.value)  || 0;
     const ret = parseFloat(document.getElementById(`return-${a.key}`)?.value) || 0;

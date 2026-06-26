@@ -329,7 +329,20 @@
       <!-- Corpus & returns table -->
       <div class="card">
         <h2 class="card-title">Current Corpus &amp; Asset Allocation</h2>
-        <p class="card-hint">Enter existing portfolio value in <strong>Current Value</strong>. <strong>New Annual Allocation</strong> is auto-filled from your invest % — edit per asset class as needed. Returns are earned on the combined total.</p>
+        <p class="card-hint">First select the asset classes you invest in, then enter your current portfolio value. <strong>New Annual Allocation</strong> is auto-filled from your invest % — edit per class as needed.</p>
+
+        <!-- Asset class selector -->
+        <div class="asset-selector-wrap">
+          <button class="asset-selector-toggle" onclick="toggleAssetSelectorPanel()">
+            <span>📋 &nbsp;Choose your investments</span>
+            <span class="selector-toggle-right">
+              <span id="asset-selector-count">7 asset classes selected</span>
+              <span id="selector-chevron">▸</span>
+            </span>
+          </button>
+          <div id="asset-selector-panel" class="hidden"><!-- rendered by JS --></div>
+        </div>
+
         <div class="table-wrap">
           <table id="corpus-table">
             <thead>
