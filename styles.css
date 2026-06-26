@@ -59,14 +59,77 @@ h1 {
 }
 
 /* Upload Card */
-/* Home description */
-.home-desc {
+/* How-to steps */
+.how-to-steps {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.how-to-step {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  position: relative;
+  padding-bottom: 4px;
+}
+
+.how-to-step:not(:last-child) .step-num::after {
+  content: '';
+  position: absolute;
+  left: 17px;
+  top: 36px;
+  width: 2px;
+  height: calc(100% - 4px);
+  background: var(--border);
+}
+
+.step-num {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff;
+  font-size: .85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+  margin-top: 2px;
+}
+
+.step-body {
+  padding-bottom: 20px;
+  flex: 1;
+}
+
+.step-title {
   font-size: .95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.step-desc {
+  font-size: .82rem;
   color: var(--text-muted);
-  line-height: 1.75;
+  line-height: 1.65;
+}
+
+.how-to-privacy {
+  font-size: .78rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 4px;
   text-align: center;
 }
-.home-desc strong { color: var(--text); }
 
 /* Home option cards */
 .home-options {
