@@ -793,6 +793,44 @@ tfoot td {
   font-weight: 600;
 }
 
+/* ===== DISCLAIMER FOOTER ===== */
+.disclaimer-footer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 20px 32px;
+  margin-top: auto;
+}
+
+.disclaimer-inner {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.disclaimer-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+  opacity: 0.7;
+}
+
+.disclaimer-text {
+  font-size: .75rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.disclaimer-text strong {
+  color: #b0b4c8;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .disclaimer-footer { padding: 16px 20px; }
+}
+
 /* Disabled form input */
 .form-input:disabled {
   opacity: 0.4;
