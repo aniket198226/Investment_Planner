@@ -158,11 +158,11 @@ const ASSET_CLASSES = [
 let pieChart = null;
 let bankData  = null; // populated from bank statement analysis, consumed by planner
 
-// Asset classes the user has opted into (pre-seeded with 7 common ones)
+// Asset classes the user has opted into — starts empty, user selects via checkbox panel
 const DEFAULT_SELECTED_KEYS = new Set([
   'mf_large', 'mf_mid', 'mf_flexi', 'debt_pf', 'debt_ppf', 'gold_sgb', 'fd_bank',
 ]);
-let selectedAssetKeys = new Set([...DEFAULT_SELECTED_KEYS]);
+let selectedAssetKeys = new Set();
 
 // ===== UTILS =====
 const fmt = (n) =>
@@ -1027,6 +1027,10 @@ function renderAssetSelector() {
   });
   html += '</div>';
   panel.innerHTML = html;
+  // Always open the panel when the planner first loads
+  panel.classList.remove('hidden');
+  const chevron = document.getElementById('selector-chevron');
+  if (chevron) chevron.textContent = '▾';
   updateSelectorCount();
 }
 
@@ -1078,8 +1082,12 @@ function renderCorpusTable() {
 
   let html = '';
   if (!selected.length) {
-    html = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:28px 16px">
-      No asset classes selected. Click <strong>"Choose your investments"</strong> above to add some.
+    html = `<tr><td colspan="4">
+      <div class="corpus-empty-state">
+        <div class="corpus-empty-icon">☝️</div>
+        <div class="corpus-empty-title">No asset classes selected yet</div>
+        <div class="corpus-empty-desc">Use <strong>Choose your investments</strong> above to pick the asset classes you hold. They'll appear here as a table for you to fill in current values.</div>
+      </div>
     </td></tr>`;
   } else {
     cats.forEach((cat) => {
