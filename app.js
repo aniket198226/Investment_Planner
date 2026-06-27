@@ -1041,7 +1041,7 @@ function toggleAssetClass(key, checked) {
   if (label) label.classList.toggle('asset-checkbox-row--checked', checked);
   renderCorpusTable();
   updateSelectorCount();
-  updateCorpusTotals();
+  allocateEqually(); // redistributes invest % equally across newly selected set
 }
 
 function updateSelectorCount() {
