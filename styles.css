@@ -867,11 +867,15 @@ tfoot td {
   padding: 5px 8px;
   font-size: .875rem;
   text-align: right;
-  width: 140px;
+  width: 120px;
 }
 
 .corpus-input:focus { outline: none; border-color: var(--accent); }
-.return-input { width: 65px; }
+.return-input { width: 60px; }
+
+/* Give projection tables a min-width so they scroll cleanly on small screens */
+.projection-section .table-wrap table { min-width: 520px; }
+#corpus-table { min-width: 460px; }
 
 .cat-row td {
   background: rgba(108, 99, 255, .08);
@@ -969,6 +973,98 @@ tfoot td {
   .disclaimer-footer { padding: 16px 20px; }
 }
 
+/* ===== MOBILE — 640px (headers, buttons) ===== */
+@media (max-width: 640px) {
+  /* Dashboard header: wrap so buttons don't overflow */
+  .dash-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  .dash-meta {
+    order: 10;
+    width: 100%;
+    margin-left: 0;
+    font-size: .78rem;
+  }
+  /* Shrink header buttons */
+  .dash-header .btn-primary,
+  .dash-header .btn-outline {
+    font-size: .78rem;
+    padding: 7px 12px;
+  }
+  /* Planner header: back button text shorter */
+  #planner-back-btn { font-size: .78rem; padding: 7px 12px; }
+  /* Summary cards: 2-column grid */
+  .summary-strip { grid-template-columns: 1fr 1fr; }
+}
+
+/* ===== MOBILE — 480px (everything else) ===== */
+@media (max-width: 480px) {
+  /* Hero banner */
+  .hero-banner { padding: 28px 16px 20px; gap: 20px; }
+  .hero-banner h1 { font-size: 1.7rem; }
+  .hero-eyebrow { font-size: .72rem; padding: 5px 12px; }
+  .hero-subtitle { font-size: .88rem; }
+  .hero-trust { gap: 8px; }
+  .trust-item { font-size: .7rem; padding: 4px 10px; }
+
+  /* How-it-works section */
+  .hero { padding: 12px 16px 56px; gap: 20px; }
+  .step-title { font-size: .88rem; }
+  .step-desc  { font-size: .78rem; }
+
+  /* Home option cards */
+  .home-option-title { font-size: .92rem; }
+  .home-option-desc  { font-size: .78rem; }
+  .option-svg { width: 64px; height: 48px; }
+
+  /* Cards */
+  .card { padding: 14px; }
+  .card-title { font-size: .92rem; margin-bottom: 14px; }
+
+  /* Planner body */
+  .planner-body { padding: 12px 12px 40px; }
+
+  /* Corpus table inputs — smaller on phone */
+  .corpus-input { width: 88px; font-size: .8rem; padding: 4px 5px; }
+  .return-input { width: 48px; }
+
+  /* Calculate button */
+  .btn-large { padding: 12px 24px; font-size: .9rem; width: 100%; }
+  .planner-actions { padding: 4px 0; }
+
+  /* Asset selector grid → single column */
+  .asset-selector-grid { grid-template-columns: 1fr; }
+  #asset-selector-panel { padding: 14px; }
+
+  /* Statement snapshot strip → 2 col */
+  .statement-mini-strip { grid-template-columns: 1fr 1fr; }
+  .statement-mini-value { font-size: .95rem; }
+
+  /* Snapshot editable inputs */
+  .snapshot-income-input,
+  .snapshot-expense-input,
+  .snapshot-emi-input { font-size: .95rem; }
+
+  /* Form grid inside planner cards */
+  .form-inline-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Section label */
+  .section-label { font-size: .68rem; }
+
+  /* Summary cards: force 2-col */
+  .summary-strip { grid-template-columns: 1fr 1fr; padding: 12px 12px 0; }
+  .summary-value { font-size: 1.15rem; }
+
+  /* Chart card: smaller chart */
+  .chart-wrap { max-width: 220px; }
+
+  /* Disclaimer */
+  .disclaimer-footer { padding: 14px 16px; }
+  .disclaimer-text { font-size: .7rem; }
+}
+
 /* Disabled form input */
 .form-input:disabled {
   opacity: 0.4;
@@ -991,7 +1087,9 @@ tfoot td {
   pointer-events: none;
   transition: opacity .3s ease, transform .3s ease;
   z-index: 9999;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: calc(100vw - 48px);
+  text-align: center;
   box-shadow: 0 4px 20px rgba(0,0,0,.4);
 }
 .planner-toast--show {
