@@ -30,6 +30,67 @@ body {
 .screen { width: 100%; }
 .hidden { display: none !important; }
 
+/* ===== SITE NAV ===== */
+.site-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 32px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+
+.site-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Auth area */
+.auth-user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  object-fit: cover;
+}
+
+.auth-name {
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.auth-signout {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: .75rem;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.auth-signout:hover { border-color: var(--expense); color: var(--expense); }
+
+@media (max-width: 480px) {
+  .site-nav { padding: 10px 16px; }
+  .site-nav-brand { font-size: .9rem; }
+  .auth-name { display: none; }
+}
+
 /* ===== HERO BANNER ===== */
 .hero-banner {
   display: flex;

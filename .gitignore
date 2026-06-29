@@ -1,9 +1,7 @@
 # Dependencies
 node_modules/
-package-lock.json
-package.json
 
-# Bank statements (sensitive personal data)
+# Bank statements (sensitive personal data — never commit)
 *.csv
 *.xls
 *.xlsx
@@ -11,3 +9,7 @@ package.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Local env (never commit secrets)
+.env
+.env.local

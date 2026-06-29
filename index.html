@@ -8,8 +8,18 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+
+  <!-- ===== SITE NAV (persistent across all screens) ===== -->
+  <nav class="site-nav">
+    <div class="site-nav-brand">
+      <span>📊</span>
+      <span>CorpusPlan</span>
+    </div>
+    <div id="auth-nav-area"><!-- rendered by JS --></div>
+  </nav>
   <!-- ===== UPLOAD SCREEN ===== -->
   <section id="upload-screen" class="screen">
 

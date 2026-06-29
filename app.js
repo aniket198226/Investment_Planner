@@ -164,6 +164,187 @@ const DEFAULT_SELECTED_KEYS = new Set([
 ]);
 let selectedAssetKeys = new Set();
 
+// ===== AUTH STATE =====
+// Replace this with your actual Google Client ID from Google Cloud Console
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
+
+let currentUser  = null;
+let authToken    = null;
+let pendingPlan  = null; // plan loaded at login, applied when planner opens
+
+// Restore session from localStorage on page load
+(function restoreSession() {
+  try {
+    const raw = localStorage.getItem('corpusplan_auth');
+    if (!raw) return;
+    const { token, user } = JSON.parse(raw);
+    // Check JWT not expired (decode payload without verification — server verifies on each API call)
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.exp * 1000 < Date.now()) { localStorage.removeItem('corpusplan_auth'); return; }
+    authToken   = token;
+    currentUser = user;
+    // Pre-fetch the saved plan so it's ready when planner opens
+    fetchPlan().then(data => { pendingPlan = data; });
+  } catch { localStorage.removeItem('corpusplan_auth'); }
+})();
+
+// ===== AUTH FUNCTIONS =====
+async function handleGoogleCredential(response) {
+  try {
+    const res  = await fetch('/api/auth', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ idToken: response.credential }),
+    });
+    const data = await res.json();
+    if (!data.token) throw new Error(data.error || 'Login failed');
+
+    authToken   = data.token;
+    currentUser = data.user;
+    localStorage.setItem('corpusplan_auth', JSON.stringify({ token: data.token, user: data.user }));
+    renderAuthNav();
+
+    // Load any previously saved plan
+    pendingPlan = await fetchPlan();
+    const first = currentUser.name.split(' ')[0];
+    showPlannerToast(
+      pendingPlan
+        ? `Welcome back, ${first}! Your saved plan has been loaded.`
+        : `Welcome, ${first}! Sign-in successful.`,
+      'success'
+    );
+  } catch (err) {
+    console.error('Login error:', err);
+    showPlannerToast('Sign-in failed. Please try again.');
+  }
+}
+
+function signOut() {
+  authToken   = null;
+  currentUser = null;
+  pendingPlan = null;
+  localStorage.removeItem('corpusplan_auth');
+  if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
+  renderAuthNav();
+  showPlannerToast('Signed out successfully.', 'success');
+}
+
+function renderAuthNav() {
+  const area = document.getElementById('auth-nav-area');
+  if (!area) return;
+  if (currentUser) {
+    area.innerHTML = `
+      <div class="auth-user-chip">
+        <img src="${currentUser.picture}" class="auth-avatar" alt="${currentUser.name}">
+        <span class="auth-name">${currentUser.name.split(' ')[0]}</span>
+        <button class="auth-signout" onclick="signOut()">Sign out</button>
+      </div>`;
+  } else {
+    area.innerHTML = '<div id="google-signin-btn"></div>';
+    if (typeof google !== 'undefined' && google.accounts) {
+      google.accounts.id.renderButton(
+        document.getElementById('google-signin-btn'),
+        { theme: 'filled_black', size: 'medium', text: 'signin_with', shape: 'rectangular' }
+      );
+    }
+  }
+}
+
+function initGoogleAuth() {
+  if (typeof google === 'undefined' || !google.accounts) return;
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+  renderAuthNav();
+}
+
+// ===== PLAN SAVE / LOAD =====
+async function fetchPlan() {
+  if (!authToken) return null;
+  try {
+    const res = await fetch('/api/plans', { headers: { Authorization: `Bearer ${authToken}` } });
+    const { plan } = await res.json();
+    return plan;
+  } catch { return null; }
+}
+
+async function savePlan() {
+  if (!authToken) return;
+  try {
+    const data = collectPlanData();
+    await fetch('/api/plans', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+      body:    JSON.stringify({ data }),
+    });
+    showPlannerToast('Plan saved to your account.', 'success');
+  } catch { showPlannerToast('Could not save plan — please try again.'); }
+}
+
+function collectPlanData() {
+  const corpus = {};
+  ASSET_CLASSES.filter(a => selectedAssetKeys.has(a.key)).forEach((a) => {
+    corpus[a.key] = {
+      current: parseFloat(document.getElementById(`corpus-${a.key}`)?.value) || 0,
+      alloc:   parseFloat(document.getElementById(`alloc-${a.key}`)?.value)  || 0,
+      ret:     parseFloat(document.getElementById(`return-${a.key}`)?.value) || a.defaultReturn,
+    };
+  });
+  return {
+    selectedAssetKeys: [...selectedAssetKeys],
+    corpus,
+    personal: {
+      currentAge:     parseInt(document.getElementById('p-current-age')?.value)     || 35,
+      retirementAge:  parseInt(document.getElementById('p-retirement-age')?.value)  || 60,
+      lifeExpectancy: parseInt(document.getElementById('p-life-expectancy')?.value) || 80,
+      incomeGrowth:   parseFloat(document.getElementById('p-income-growth')?.value) || 9,
+      inflation:      parseFloat(document.getElementById('p-inflation')?.value)     || 9,
+      investPct:      parseFloat(document.getElementById('p-invest-pct')?.value)    || 10,
+    },
+    snapshot: {
+      income:   parseFormattedInput('p-annual-income'),
+      expenses: parseFormattedInput('p-annual-expenses'),
+      emi:      parseFormattedInput('p-annual-emi'),
+      emiYears: parseInt(document.getElementById('p-emi-years')?.value) || 0,
+    },
+  };
+}
+
+async function applyPlanData(data) {
+  if (!data) return;
+  selectedAssetKeys = new Set(data.selectedAssetKeys || []);
+  renderAssetSelector();
+  renderCorpusTable();
+  // Let the DOM update before filling in values
+  await new Promise(r => setTimeout(r, 0));
+  if (data.corpus) {
+    Object.entries(data.corpus).forEach(([key, val]) => {
+      const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      setV(`corpus-${key}`, val.current || 0);
+      setV(`alloc-${key}`,  val.alloc   || 0);
+      setV(`return-${key}`, val.ret     || 0);
+    });
+  }
+  if (data.personal) {
+    const p = data.personal;
+    const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    setV('p-current-age',     p.currentAge);
+    setV('p-retirement-age',  p.retirementAge);
+    setV('p-life-expectancy', p.lifeExpectancy);
+    setV('p-income-growth',   p.incomeGrowth);
+    setV('p-inflation',       p.inflation);
+    setV('p-invest-pct',      p.investPct);
+  }
+  if (data.snapshot) {
+    const s = data.snapshot;
+    const setFmt = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = fmtInput(v); };
+    setFmt('p-annual-income',   s.income);
+    setFmt('p-annual-expenses', s.expenses);
+    setFmt('p-annual-emi',      s.emi);
+    const ey = document.getElementById('p-emi-years');
+    if (ey && s.emiYears) ey.value = s.emiYears;
+  }
+  updateCorpusTotals();
+}
+
 // ===== UTILS =====
 const fmt = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
@@ -789,6 +970,9 @@ function initPlanner() {
   renderCorpusTable();
   renderPlannerSnapshot();
 
+  // Restore saved plan if the user is logged in and one was fetched
+  if (pendingPlan) { applyPlanData(pendingPlan); pendingPlan = null; }
+
   // Pre-fill investment % from bank data, then auto-allocate
   if (bankData && bankData.monthlyIncome > 0) {
     const pct = (bankData.monthlyInvestment / bankData.monthlyIncome * 100).toFixed(1);
@@ -895,7 +1079,7 @@ function allocateEqually() {
   updateCorpusTotals();
 }
 
-function showPlannerToast(msg) {
+function showPlannerToast(msg, type = 'error') {
   let toast = document.getElementById('planner-toast');
   if (!toast) {
     toast = document.createElement('div');
@@ -904,6 +1088,7 @@ function showPlannerToast(msg) {
     document.body.appendChild(toast);
   }
   toast.textContent = msg;
+  toast.style.background = type === 'success' ? '#00a67d' : '#ff4060';
   toast.classList.add('planner-toast--show');
   clearTimeout(toast._hideTimer);
   toast._hideTimer = setTimeout(() => toast.classList.remove('planner-toast--show'), 4500);
@@ -1243,6 +1428,9 @@ function calculateProjection() {
   renderProjectionTables(preRows, postRows);
   document.getElementById('projection-output').classList.remove('hidden');
   document.getElementById('projection-output').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Auto-save plan to MongoDB if user is logged in
+  if (authToken) savePlan();
 }
 
 function renderProjectionTables(preRows, postRows) {
@@ -1272,3 +1460,10 @@ function renderProjectionTables(preRows, postRows) {
     </tr>
   `).join('');
 }
+
+// ===== GOOGLE AUTH INIT =====
+// Runs after GIS script loads (defer)
+window.addEventListener('load', () => {
+  // Small delay to ensure GIS script is initialised
+  setTimeout(initGoogleAuth, 300);
+});
