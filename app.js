@@ -165,8 +165,7 @@ const DEFAULT_SELECTED_KEYS = new Set([
 let selectedAssetKeys = new Set();
 
 // ===== AUTH STATE =====
-// Replace this with your actual Google Client ID from Google Cloud Console
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
+const GOOGLE_CLIENT_ID = '316752082804-ip1no3g1ikg7ihvkfhavhkotl8s006qd.apps.googleusercontent.com';
 
 let currentUser  = null;
 let authToken    = null;
