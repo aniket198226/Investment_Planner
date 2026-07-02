@@ -205,6 +205,15 @@
         </div>
       </div>
 
+      <!-- My Plans Section — visible only when logged in with saved plans -->
+      <div id="my-plans-section" class="hidden my-plans-section">
+        <div class="my-plans-header">
+          <h2 class="my-plans-title">My Saved Plans</h2>
+          <p class="my-plans-subtitle">Pick up where you left off — load any saved plan into the planner.</p>
+        </div>
+        <div id="my-plans-grid" class="my-plans-grid"></div>
+      </div>
+
       <div id="upload-section" class="hidden">
         <div class="upload-card" id="drop-zone">
           <div class="upload-icon">⬆️</div>
@@ -379,6 +388,7 @@
       <!-- Calculate -->
       <div class="planner-actions">
         <button class="btn-primary btn-large" id="calculate-btn">Calculate Retirement Projection →</button>
+        <button class="btn-outline btn-save-plan" onclick="openSavePlanDialog()" title="Save plan to your account">💾 Save Plan</button>
       </div>
 
       <!-- Projection output -->
@@ -461,6 +471,23 @@
       </p>
     </div>
   </footer>
+
+  <!-- Save Plan Modal -->
+  <div id="save-plan-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeSavePlanDialog()">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Save Your Plan</h3>
+        <button class="modal-close" onclick="closeSavePlanDialog()">✕</button>
+      </div>
+      <p class="modal-desc">Give your plan a name so you can find it later. If the name matches an existing plan, it will be updated.</p>
+      <input id="save-plan-name-input" class="modal-input" type="text" placeholder="e.g. Retirement at 55" maxlength="60"
+             onkeydown="if(event.key==='Enter')confirmSavePlan()">
+      <div class="modal-actions">
+        <button class="btn-outline" onclick="closeSavePlanDialog()">Cancel</button>
+        <button class="btn-primary" onclick="confirmSavePlan()">Save Plan</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

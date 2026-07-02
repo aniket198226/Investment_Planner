@@ -3,7 +3,7 @@ const { connectDB, Plan } = require('./_db');
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
@@ -33,17 +33,36 @@ module.exports = async function handler(req, res) {
   await connectDB();
 
   if (req.method === 'GET') {
-    const plan = await Plan.findOne({ userId: session.uid });
-    return res.json({ plan: plan?.data ?? null });
+    const plans = await Plan.find({ userId: session.uid })
+      .sort({ updatedAt: -1 })
+      .select('name updatedAt createdAt data')
+      .lean();
+    return res.json({ plans });
   }
 
   if (req.method === 'POST') {
-    const { data } = await parseBody(req);
-    await Plan.findOneAndUpdate(
-      { userId: session.uid },
-      { data, updatedAt: new Date() },
-      { upsert: true }
-    );
+    const { data, name, planId } = await parseBody(req);
+    if (planId) {
+      await Plan.findOneAndUpdate(
+        { _id: planId, userId: session.uid },
+        { data, name: name || 'My Plan', updatedAt: new Date() }
+      );
+      return res.json({ ok: true, planId });
+    } else {
+      const plan = await Plan.create({
+        userId: session.uid,
+        name: name || 'My Plan',
+        data,
+        updatedAt: new Date(),
+      });
+      return res.json({ ok: true, planId: plan._id.toString() });
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    const planId = req.query?.id;
+    if (!planId) return res.status(400).json({ error: 'Missing plan id' });
+    await Plan.findOneAndDelete({ _id: planId, userId: session.uid });
     return res.json({ ok: true });
   }
 

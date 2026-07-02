@@ -5,6 +5,8 @@ let connected = false;
 async function connectDB() {
   if (connected) return;
   await mongoose.connect(process.env.MONGODB_URI);
+  // Drop legacy unique index on userId to support multiple plans per user
+  try { await mongoose.connection.db.collection('plans').dropIndex('userId_1'); } catch {}
   connected = true;
 }
 
@@ -17,8 +19,10 @@ const UserSchema = new mongoose.Schema({
 });
 
 const PlanSchema = new mongoose.Schema({
-  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+  userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  name:      { type: String, default: 'My Plan' },
   data:      mongoose.Schema.Types.Mixed,
+  createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
 

@@ -167,9 +167,12 @@ let selectedAssetKeys = new Set();
 // ===== AUTH STATE =====
 const GOOGLE_CLIENT_ID = '316752082804-ip1no3g1ikg7ihvkfhavhkotl8s006qd.apps.googleusercontent.com';
 
-let currentUser  = null;
-let authToken    = null;
-let pendingPlan  = null; // plan loaded at login, applied when planner opens
+let currentUser    = null;
+let authToken      = null;
+let pendingPlan    = null; // plan loaded at login, applied when planner opens
+let allPlans       = [];   // all saved plans for the logged-in user
+let currentPlanId  = null; // ID of the currently loaded plan
+let currentPlanName = null;
 
 // Restore session from localStorage on page load
 (function restoreSession() {
@@ -177,13 +180,15 @@ let pendingPlan  = null; // plan loaded at login, applied when planner opens
     const raw = localStorage.getItem('corpusplan_auth');
     if (!raw) return;
     const { token, user } = JSON.parse(raw);
-    // Check JWT not expired (decode payload without verification — server verifies on each API call)
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.exp * 1000 < Date.now()) { localStorage.removeItem('corpusplan_auth'); return; }
     authToken   = token;
     currentUser = user;
-    // Pre-fetch the saved plan so it's ready when planner opens
-    fetchPlan().then(data => { pendingPlan = data; });
+    fetchAllPlans().then(plans => {
+      allPlans = plans;
+      if (plans.length) pendingPlan = plans[0].data;
+      renderMyPlans();
+    });
   } catch { localStorage.removeItem('corpusplan_auth'); }
 })();
 
@@ -203,12 +208,14 @@ async function handleGoogleCredential(response) {
     localStorage.setItem('corpusplan_auth', JSON.stringify({ token: data.token, user: data.user }));
     renderAuthNav();
 
-    // Load any previously saved plan
-    pendingPlan = await fetchPlan();
+    allPlans = await fetchAllPlans();
+    if (allPlans.length) pendingPlan = allPlans[0].data;
+    renderMyPlans();
+
     const first = currentUser.name.split(' ')[0];
     showPlannerToast(
-      pendingPlan
-        ? `Welcome back, ${first}! Your saved plan has been loaded.`
+      allPlans.length
+        ? `Welcome back, ${first}! Your saved plans are ready.`
         : `Welcome, ${first}! Sign-in successful.`,
       'success'
     );
@@ -219,12 +226,16 @@ async function handleGoogleCredential(response) {
 }
 
 function signOut() {
-  authToken   = null;
-  currentUser = null;
-  pendingPlan = null;
+  authToken      = null;
+  currentUser    = null;
+  pendingPlan    = null;
+  allPlans       = [];
+  currentPlanId  = null;
+  currentPlanName = null;
   localStorage.removeItem('corpusplan_auth');
   if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
   renderAuthNav();
+  renderMyPlans();
   showPlannerToast('Signed out successfully.', 'success');
 }
 
@@ -256,26 +267,110 @@ function initGoogleAuth() {
 }
 
 // ===== PLAN SAVE / LOAD =====
-async function fetchPlan() {
-  if (!authToken) return null;
-  try {
-    const res = await fetch('/api/plans', { headers: { Authorization: `Bearer ${authToken}` } });
-    const { plan } = await res.json();
-    return plan;
-  } catch { return null; }
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-async function savePlan() {
+async function fetchAllPlans() {
+  if (!authToken) return [];
+  try {
+    const res = await fetch('/api/plans', { headers: { Authorization: `Bearer ${authToken}` } });
+    const { plans } = await res.json();
+    return plans || [];
+  } catch { return []; }
+}
+
+async function savePlanWithName(name, planId) {
   if (!authToken) return;
   try {
     const data = collectPlanData();
-    await fetch('/api/plans', {
+    const res = await fetch('/api/plans', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-      body:    JSON.stringify({ data }),
+      body:    JSON.stringify({ data, name, planId }),
     });
-    showPlannerToast('Plan saved to your account.', 'success');
+    const result = await res.json();
+    currentPlanId   = result.planId;
+    currentPlanName = name;
+    allPlans = await fetchAllPlans();
+    renderMyPlans();
+    showPlannerToast(`Plan "${name}" saved.`, 'success');
   } catch { showPlannerToast('Could not save plan — please try again.'); }
+}
+
+function openSavePlanDialog() {
+  if (!authToken) { showPlannerToast('Please sign in to save your plan.'); return; }
+  const modal = document.getElementById('save-plan-modal');
+  const input = document.getElementById('save-plan-name-input');
+  if (input) input.value = currentPlanName || '';
+  modal?.classList.remove('hidden');
+  setTimeout(() => input?.focus(), 50);
+}
+
+function closeSavePlanDialog() {
+  document.getElementById('save-plan-modal')?.classList.add('hidden');
+}
+
+async function confirmSavePlan() {
+  const input = document.getElementById('save-plan-name-input');
+  const name  = input?.value.trim();
+  if (!name) { input?.focus(); showPlannerToast('Please enter a plan name.'); return; }
+  // If same name as current loaded plan, update it; otherwise create new
+  const matchingPlan = allPlans.find(p => p.name === name);
+  const planId = matchingPlan ? matchingPlan._id : (currentPlanName === name ? currentPlanId : null);
+  closeSavePlanDialog();
+  await savePlanWithName(name, planId || null);
+}
+
+async function deleteSavedPlan(planId) {
+  if (!confirm('Delete this plan? This cannot be undone.')) return;
+  try {
+    await fetch(`/api/plans?id=${planId}`, {
+      method:  'DELETE',
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+    if (currentPlanId === planId) { currentPlanId = null; currentPlanName = null; }
+    allPlans = await fetchAllPlans();
+    renderMyPlans();
+    showPlannerToast('Plan deleted.', 'success');
+  } catch { showPlannerToast('Could not delete plan.'); }
+}
+
+function loadSavedPlanById(planId) {
+  const plan = allPlans.find(p => p._id === planId);
+  if (!plan) return;
+  currentPlanId   = planId;
+  currentPlanName = plan.name;
+  pendingPlan     = plan.data;
+  document.getElementById('upload-screen').classList.add('hidden');
+  document.getElementById('planner-screen').classList.remove('hidden');
+  initPlanner();
+  showPlannerToast(`"${plan.name}" loaded.`, 'success');
+}
+
+function renderMyPlans() {
+  const section = document.getElementById('my-plans-section');
+  if (!section) return;
+  if (!currentUser || !allPlans.length) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  const grid = document.getElementById('my-plans-grid');
+  if (!grid) return;
+  grid.innerHTML = allPlans.map(p => {
+    const date       = new Date(p.updatedAt).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+    const assetCount = p.data?.selectedAssetKeys?.length || 0;
+    return `
+      <div class="plan-card">
+        <div class="plan-card-header">
+          <div class="plan-card-name">${escHtml(p.name)}</div>
+          <button class="plan-card-delete" onclick="deleteSavedPlan('${p._id}')" title="Delete plan">✕</button>
+        </div>
+        <div class="plan-card-meta">
+          <span>${assetCount} asset class${assetCount !== 1 ? 'es' : ''}</span>
+          <span>Saved ${date}</span>
+        </div>
+        <button class="btn-outline plan-card-load" onclick="loadSavedPlanById('${p._id}')">Load Plan →</button>
+      </div>`;
+  }).join('');
 }
 
 function collectPlanData() {
@@ -1428,8 +1523,6 @@ function calculateProjection() {
   document.getElementById('projection-output').classList.remove('hidden');
   document.getElementById('projection-output').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  // Auto-save plan to MongoDB if user is logged in
-  if (authToken) savePlan();
 }
 
 function renderProjectionTables(preRows, postRows) {
