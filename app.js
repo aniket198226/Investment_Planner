@@ -226,17 +226,43 @@ async function handleGoogleCredential(response) {
 }
 
 function signOut() {
-  authToken      = null;
-  currentUser    = null;
-  pendingPlan    = null;
-  allPlans       = [];
-  currentPlanId  = null;
+  authToken       = null;
+  currentUser     = null;
+  pendingPlan     = null;
+  allPlans        = [];
+  currentPlanId   = null;
   currentPlanName = null;
+  bankData        = null;
   localStorage.removeItem('corpusplan_auth');
   if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
+
+  // Reset planner state
+  selectedAssetKeys = new Set();
+  resetPlannerInputs();
+
+  // Navigate back to home screen
+  document.getElementById('planner-screen').classList.add('hidden');
+  document.getElementById('dashboard-screen').classList.add('hidden');
+  document.getElementById('upload-screen').classList.remove('hidden');
+
   renderAuthNav();
   renderMyPlans();
   showPlannerToast('Signed out successfully.', 'success');
+}
+
+function resetPlannerInputs() {
+  const ids = [
+    'p-annual-income','p-annual-expenses','p-annual-emi','p-emi-years',
+    'p-current-age','p-retirement-age','p-life-expectancy',
+    'p-income-growth','p-inflation','p-invest-pct',
+  ];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('projection-output')?.classList.add('hidden');
+  // Re-render selector and table to show empty state
+  if (document.getElementById('asset-selector-panel')) {
+    renderAssetSelector();
+    renderCorpusTable();
+  }
 }
 
 function renderAuthNav() {
