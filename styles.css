@@ -51,6 +51,11 @@ body {
   font-weight: 700;
   color: var(--text);
 }
+.site-nav-logo {
+  height: 32px;
+  width: auto;
+  display: block;
+}
 
 /* Auth area */
 .auth-user-chip {
