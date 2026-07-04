@@ -52,13 +52,9 @@ body {
   color: var(--text);
 }
 .site-nav-logo {
-  height: 28px;
+  height: 32px;
   width: auto;
   display: block;
-  background: #ffffff;
-  border-radius: 6px;
-  padding: 3px 10px;
-  box-sizing: content-box;
 }
 
 /* Auth area */
