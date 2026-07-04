@@ -26,6 +26,11 @@
       <span>📊</span>
       <span>CorpusPlan</span>
     </div>
+    <div class="site-nav-links">
+      <button class="nav-link" id="nav-home">Home</button>
+      <button class="nav-link" id="nav-goals">🎯 Goals</button>
+      <button class="nav-link" id="nav-retirement">Retirement</button>
+    </div>
     <div id="auth-nav-area"><!-- rendered by JS --></div>
   </nav>
   <!-- ===== UPLOAD SCREEN ===== -->
@@ -34,9 +39,9 @@
     <!-- ===== HERO BANNER (two-column) ===== -->
     <div class="hero-banner">
       <div class="hero-left">
-        <div class="hero-eyebrow">📊 Retirement Planning Tool</div>
-        <h1>Plan Your<br>Financial Future</h1>
-        <p class="hero-subtitle">Analyse your bank statement or enter your numbers manually. Get a year-by-year projection of your retirement corpus — all in your browser.</p>
+        <div class="hero-eyebrow">🎯 Goal-Based Financial Planning</div>
+        <h1>Plan Every<br>Financial Goal</h1>
+        <p class="hero-subtitle">House, car, education, wedding, retirement — plan them all together. Get the exact monthly SIP each goal needs, see if your surplus covers them, and rebalance with clear suggestions — all in your browser.</p>
         <div class="hero-trust">
           <span class="trust-item">🔒 100% Private</span>
           <span class="trust-item">⚡ Instant Results</span>
@@ -191,7 +196,22 @@
           <p class="home-option-desc">Automatically detect income, expenses, EMIs, and investments from your CSV or Excel statement. Your numbers pre-fill the investment planner instantly.</p>
           <button class="btn-outline home-option-btn" id="select-upload-btn">Upload Statement ↓</button>
         </div>
-        <div class="home-option-card home-option-card--primary" id="opt-manual-card">
+        <div class="home-option-card home-option-card--primary" id="opt-goals-card">
+          <div class="home-option-visual home-option-visual--goals">
+            <svg viewBox="0 0 64 48" xmlns="http://www.w3.org/2000/svg" class="option-svg">
+              <circle cx="32" cy="24" r="18" fill="rgba(0,212,170,0.08)" stroke="rgba(0,212,170,0.35)" stroke-width="1.5"/>
+              <circle cx="32" cy="24" r="11.5" fill="rgba(108,99,255,0.1)" stroke="rgba(108,99,255,0.4)" stroke-width="1.5"/>
+              <circle cx="32" cy="24" r="5" fill="rgba(0,212,170,0.3)" stroke="#00d4aa" stroke-width="1.5"/>
+              <circle cx="32" cy="24" r="1.8" fill="#00d4aa"/>
+              <path d="M45 11 L52 4 M52 4 L52 9 M52 4 L47 4" stroke="#6c63ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <path d="M45 11 L33 23" stroke="#6c63ff" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="2.5,2.5"/>
+            </svg>
+          </div>
+          <h3 class="home-option-title">Multi-Goal Planner</h3>
+          <p class="home-option-desc">Plan a house, car, education, wedding, vacation, and retirement together. Get the required monthly SIP per goal, inflation-adjusted targets, and rebalancing suggestions.</p>
+          <button class="btn-primary home-option-btn" id="goals-btn">Plan My Goals →</button>
+        </div>
+        <div class="home-option-card" id="opt-manual-card">
           <div class="home-option-visual home-option-visual--manual">
             <svg viewBox="0 0 64 48" xmlns="http://www.w3.org/2000/svg" class="option-svg">
               <rect x="4" y="6" width="44" height="36" rx="5" fill="rgba(108,99,255,0.1)" stroke="rgba(108,99,255,0.35)" stroke-width="1.5"/>
@@ -207,9 +227,9 @@
               <path d="M50 29 L55 34 L62 25" stroke="#6c63ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             </svg>
           </div>
-          <h3 class="home-option-title">Manual Entry</h3>
-          <p class="home-option-desc">Skip the statement upload. Go straight to the Investment Planner and enter your annual income, expenses, EMI, and current corpus directly.</p>
-          <button class="btn-primary home-option-btn" id="manual-btn">Start Planning →</button>
+          <h3 class="home-option-title">Retirement Planner</h3>
+          <p class="home-option-desc">Deep-dive retirement projection: enter income, expenses, EMI, and your corpus across asset classes for a year-by-year accumulation &amp; drawdown table.</p>
+          <button class="btn-outline home-option-btn" id="manual-btn">Start Planning →</button>
         </div>
       </div>
 
@@ -307,6 +327,11 @@
     </header>
 
     <div class="planner-body">
+
+      <!-- Goals cross-link -->
+      <div class="goals-crosslink" onclick="openGoalsScreen()">
+        🎯 <strong>New:</strong> Retirement is now one of many goals — plan your house, car, education &amp; more together in the <span class="goals-crosslink-cta">Goal Planner →</span>
+      </div>
 
       <!-- Statement snapshot -->
       <div class="card">
@@ -458,6 +483,79 @@
               <tbody id="post-retirement-tbody"></tbody>
             </table>
           </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GOALS SCREEN ===== -->
+  <section id="goals-screen" class="screen hidden">
+    <header class="dash-header">
+      <div class="dash-brand">
+        <span class="dash-icon">🎯</span>
+        <span class="dash-title">Goal Planner</span>
+      </div>
+      <button class="btn-outline" id="goals-back-btn">← Back to Home</button>
+    </header>
+
+    <div class="planner-body">
+
+      <!-- Step 1: Goal selection -->
+      <div class="card">
+        <h2 class="card-title">What are you saving for?</h2>
+        <p class="card-hint">Pick as many goals as you like — click a card to add it. Each goal gets its own inflation-adjusted target and required monthly SIP.</p>
+        <div id="goal-category-grid" class="goal-category-grid"><!-- rendered by JS --></div>
+      </div>
+
+      <!-- Monthly surplus -->
+      <div class="card">
+        <h2 class="card-title">Available Monthly Surplus</h2>
+        <p class="card-hint">How much can you invest per month across all goals? Pre-filled from your bank statement when available (income − expenses − EMI).</p>
+        <div class="goal-surplus-row">
+          <span class="goal-surplus-prefix">₹</span>
+          <input type="text" id="goals-surplus" class="form-input goal-surplus-input" placeholder="e.g. 50,000">
+          <span class="goal-surplus-suffix">per month</span>
+          <span id="goals-surplus-source" class="goal-surplus-source"></span>
+        </div>
+      </div>
+
+      <!-- Step 2: Goal details -->
+      <div id="goals-list-section" class="hidden">
+        <div class="card">
+          <h2 class="card-title">Goal Details</h2>
+          <p class="card-hint">Inflation rates are pre-filled per category — edit any of them. Priority decides which goal gets funded first when your surplus falls short (1 = highest).</p>
+          <div id="goals-list"><!-- rendered by JS --></div>
+        </div>
+
+        <div class="planner-actions">
+          <button class="btn-primary btn-large" id="goals-calc-btn">Calculate Goal Plan →</button>
+          <button class="btn-outline btn-save-plan" onclick="openSavePlanDialog()" title="Save goals to your account">💾 Save Plan</button>
+        </div>
+      </div>
+
+      <!-- Step 3 & 4: Results + visualisation -->
+      <div id="goals-results" class="hidden projection-section">
+
+        <div class="card" id="goals-summary-card"><!-- combined summary rendered by JS --></div>
+
+        <div id="goals-result-cards" class="goal-result-grid"><!-- per-goal cards rendered by JS --></div>
+
+        <div class="card">
+          <h2 class="card-title">Monthly SIP Allocation Across Goals</h2>
+          <p class="card-hint">How your monthly investment splits across goals each year (step-up included). Bars end as goals complete.</p>
+          <div class="goals-chart-wrap"><canvas id="goals-stacked-chart"></canvas></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Goal Timeline</h2>
+          <div id="goals-timeline"><!-- rendered by JS --></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Corpus Growth by Goal</h2>
+          <p class="card-hint">Projected value of each goal's savings (existing corpus + monthly SIP) growing to its target year.</p>
+          <div class="goals-chart-wrap"><canvas id="goals-growth-chart"></canvas></div>
         </div>
 
       </div>

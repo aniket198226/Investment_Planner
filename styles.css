@@ -318,7 +318,7 @@ h1 {
 /* Home option cards */
 .home-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 16px;
   width: 100%;
 }
@@ -1317,4 +1317,330 @@ tfoot td {
   .planner-actions { flex-direction: column; }
   .planner-actions .btn-save-plan,
   .planner-actions #calculate-btn { width: 100%; }
+}
+
+/* =====================================================================
+   GOAL-BASED PLANNER
+   ===================================================================== */
+
+/* Site nav links */
+.site-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  margin-left: 24px;
+}
+.nav-link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: .9rem;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color .15s, background .15s;
+}
+.nav-link:hover { color: var(--text); background: var(--surface2); }
+@media (max-width: 640px) {
+  .site-nav-links { margin-left: 8px; gap: 0; }
+  .nav-link { padding: 6px 8px; font-size: .8rem; }
+}
+
+/* Goal planner home-option visual */
+.home-option-visual--goals { background: rgba(0,212,170,0.06); border: 1px solid rgba(108,99,255,0.2); }
+
+/* Cross-link banner on retirement planner */
+.goals-crosslink {
+  background: linear-gradient(90deg, rgba(108,99,255,0.12), rgba(0,212,170,0.1));
+  border: 1px solid rgba(108,99,255,0.35);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  font-size: .9rem;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.goals-crosslink:hover { border-color: var(--accent); }
+.goals-crosslink-cta { color: var(--accent2); font-weight: 700; }
+
+/* Step 1 — category cards */
+.goal-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.goal-cat-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 10px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--text);
+  transition: border-color .15s, transform .15s;
+}
+.goal-cat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.goal-cat-card--active { border-color: var(--accent2); }
+.goal-cat-icon { font-size: 1.7rem; }
+.goal-cat-label { font-weight: 600; font-size: .9rem; }
+.goal-cat-add { font-size: .75rem; color: var(--text-muted); }
+.goal-cat-card:hover .goal-cat-add { color: var(--accent); }
+.goal-cat-count {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--accent2);
+  color: #06251e;
+  font-size: .75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+/* Surplus row */
+.goal-surplus-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.goal-surplus-prefix { font-size: 1.2rem; font-weight: 700; color: var(--income); }
+.goal-surplus-input { max-width: 220px; font-size: 1.05rem; font-weight: 600; }
+.goal-surplus-suffix { color: var(--text-muted); font-size: .9rem; }
+.goal-surplus-source { color: var(--accent2); font-size: .8rem; }
+
+/* Step 2 — goal detail cards */
+.goal-detail-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-top: 14px;
+}
+.goal-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.goal-detail-icon { font-size: 1.4rem; }
+.goal-name-input {
+  flex: 1;
+  min-width: 120px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed var(--border);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 4px 2px;
+}
+.goal-name-input:focus { outline: none; border-bottom-color: var(--accent); }
+.goal-cat-chip {
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--accent);
+  border: 1px solid rgba(108,99,255,0.4);
+  background: rgba(108,99,255,0.12);
+  border-radius: 20px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.goal-priority-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.goal-priority-input {
+  width: 52px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 5px 8px;
+  font-weight: 700;
+  text-align: center;
+}
+.goal-remove-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.goal-remove-btn:hover { color: var(--expense); border-color: var(--expense); }
+.goal-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px 16px;
+}
+.goal-return-row { display: flex; gap: 8px; }
+.goal-return-row .form-input { flex: 1; min-width: 70px; }
+.goal-risk-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: .8rem;
+  padding: 6px 8px;
+  max-width: 150px;
+}
+.goal-advanced { margin-top: 12px; }
+.goal-advanced summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: .85rem;
+  user-select: none;
+}
+.goal-advanced summary:hover { color: var(--text); }
+.goal-stepup-row { max-width: 280px; margin-top: 10px; }
+
+/* Step 3 — combined summary */
+.goal-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin: 14px 0;
+}
+.goal-summary-stat {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.goal-summary-label { font-size: .78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.goal-summary-value { font-size: 1.5rem; font-weight: 800; margin-top: 4px; }
+.goal-summary-unit { font-size: .8rem; font-weight: 600; color: var(--text-muted); margin-left: 3px; }
+.goal-progress-track {
+  height: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.goal-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  border-radius: 8px;
+  transition: width .4s;
+}
+.goal-progress-fill--over { background: linear-gradient(90deg, var(--emi), var(--expense)); }
+.goal-progress-caption { font-size: .8rem; color: var(--text-muted); margin-top: 6px; }
+.goal-verdict-row { margin-top: 12px; }
+.goal-verdict { font-size: .95rem; font-weight: 600; }
+.goal-verdict--ok { color: var(--income); }
+.goal-verdict--warn { color: var(--emi); }
+.goal-verdict--info { color: var(--text-muted); }
+
+/* Per-goal result cards */
+.goal-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.goal-result-card { margin: 0; }
+.goal-result-head { display: flex; align-items: center; gap: 10px; }
+.goal-result-name { flex: 1; font-weight: 700; font-size: 1.05rem; }
+.goal-result-sip { font-size: 1.6rem; font-weight: 800; color: var(--accent); margin: 10px 0 12px; }
+.goal-result-facts { display: flex; flex-direction: column; gap: 6px; }
+.goal-result-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: .85rem;
+  border-bottom: 1px dashed rgba(46,50,71,.6);
+  padding-bottom: 5px;
+}
+.goal-result-facts span { color: var(--text-muted); }
+.goal-contrib-note {
+  margin-top: 12px;
+  font-size: .83rem;
+  color: var(--emi);
+  background: rgba(255,169,77,0.08);
+  border: 1px solid rgba(255,169,77,0.25);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.goal-contrib-note--ok {
+  color: var(--income);
+  background: rgba(0,212,170,0.08);
+  border-color: rgba(0,212,170,0.25);
+}
+.goal-suggestions { margin-top: 12px; }
+.goal-suggestions-title {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.goal-suggestion {
+  font-size: .83rem;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+}
+.goal-suggestion--extend { border-color: rgba(0,212,170,0.3); }
+.goal-suggestion--reduce { border-color: rgba(108,99,255,0.35); }
+.goal-suggestion--risk { border-color: rgba(255,101,132,0.35); color: #ffb3c1; }
+.goal-suggestion--none { border-color: rgba(255,169,77,0.35); color: var(--emi); }
+
+/* Step 4 — charts & timeline */
+.goals-chart-wrap { position: relative; height: 320px; margin-top: 12px; }
+.goal-timeline { display: flex; flex-direction: column; margin-top: 8px; }
+.goal-timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 10px 0;
+}
+.gt-year { font-weight: 800; font-size: 1rem; min-width: 52px; padding-top: 2px; }
+.gt-line {
+  position: relative;
+  align-self: stretch;
+  width: 14px;
+  display: flex;
+  justify-content: center;
+}
+.gt-line::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: -20px;
+  width: 2px;
+  background: var(--border);
+}
+.goal-timeline-item:last-child .gt-line::before { bottom: 12px; }
+.gt-dot {
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 6px;
+  box-shadow: 0 0 0 3px var(--surface);
+}
+.gt-body { flex: 1; }
+.gt-name { font-weight: 700; font-size: .95rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gt-meta { color: var(--text-muted); font-size: .82rem; margin-top: 2px; }
+
+@media (max-width: 640px) {
+  .goal-detail-grid { grid-template-columns: 1fr; }
+  .goal-result-grid { grid-template-columns: 1fr; }
+  .goals-chart-wrap { height: 260px; }
 }

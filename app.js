@@ -240,9 +240,19 @@ function signOut() {
   selectedAssetKeys = new Set();
   resetPlannerInputs();
 
+  // Reset goals state
+  goals = [];
+  localStorage.removeItem('corpusplan_goals');
+  const surplusEl = document.getElementById('goals-surplus');
+  if (surplusEl) surplusEl.value = '';
+  renderGoalCategoryGrid();
+  renderGoalsList();
+  document.getElementById('goals-results')?.classList.add('hidden');
+
   // Navigate back to home screen
   document.getElementById('planner-screen').classList.add('hidden');
   document.getElementById('dashboard-screen').classList.add('hidden');
+  document.getElementById('goals-screen')?.classList.add('hidden');
   document.getElementById('upload-screen').classList.remove('hidden');
 
   renderAuthNav();
@@ -384,6 +394,7 @@ function renderMyPlans() {
   grid.innerHTML = allPlans.map(p => {
     const date       = new Date(p.updatedAt).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
     const assetCount = p.data?.selectedAssetKeys?.length || 0;
+    const goalCount  = p.data?.goalPlan?.goals?.length || 0;
     return `
       <div class="plan-card">
         <div class="plan-card-header">
@@ -391,7 +402,7 @@ function renderMyPlans() {
           <button class="plan-card-delete" onclick="deleteSavedPlan('${p._id}')" title="Delete plan">✕</button>
         </div>
         <div class="plan-card-meta">
-          <span>${assetCount} asset class${assetCount !== 1 ? 'es' : ''}</span>
+          <span>${goalCount ? `🎯 ${goalCount} goal${goalCount !== 1 ? 's' : ''} · ` : ''}${assetCount} asset class${assetCount !== 1 ? 'es' : ''}</span>
           <span>Saved ${date}</span>
         </div>
         <button class="btn-outline plan-card-load" onclick="loadSavedPlanById('${p._id}')">Load Plan →</button>
@@ -424,6 +435,10 @@ function collectPlanData() {
       expenses: parseFormattedInput('p-annual-expenses'),
       emi:      parseFormattedInput('p-annual-emi'),
       emiYears: parseInt(document.getElementById('p-emi-years')?.value) || 0,
+    },
+    goalPlan: {
+      monthlySurplus: parseFormattedInput('goals-surplus') || 0,
+      goals: goals.map(g => ({ ...g })),
     },
   };
 }
@@ -461,6 +476,15 @@ async function applyPlanData(data) {
     setFmt('p-annual-emi',      s.emi);
     const ey = document.getElementById('p-emi-years');
     if (ey && s.emiYears) ey.value = s.emiYears;
+  }
+  if (data.goalPlan && Array.isArray(data.goalPlan.goals)) {
+    goals = data.goalPlan.goals.map(g => ({ ...g }));
+    goalIdCounter = Math.max(0, ...goals.map(g => g.id || 0));
+    const surplusEl = document.getElementById('goals-surplus');
+    if (surplusEl && data.goalPlan.monthlySurplus) surplusEl.value = fmtInput(data.goalPlan.monthlySurplus);
+    renderGoalCategoryGrid();
+    renderGoalsList();
+    saveGoalsLocal();
   }
   updateCorpusTotals();
 }
@@ -1029,6 +1053,31 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('manual-btn').addEventListener('click', manualEntry);
+  document.getElementById('goals-btn').addEventListener('click', openGoalsScreen);
+
+  // Site nav
+  document.getElementById('nav-home').addEventListener('click', () => {
+    ['dashboard-screen', 'planner-screen', 'goals-screen'].forEach(s =>
+      document.getElementById(s)?.classList.add('hidden'));
+    document.getElementById('upload-screen').classList.remove('hidden');
+    window.scrollTo({ top: 0 });
+  });
+  document.getElementById('nav-goals').addEventListener('click', openGoalsScreen);
+  document.getElementById('nav-retirement').addEventListener('click', () => {
+    ['upload-screen', 'dashboard-screen', 'goals-screen'].forEach(s =>
+      document.getElementById(s)?.classList.add('hidden'));
+    document.getElementById('planner-screen').classList.remove('hidden');
+    initPlanner();
+    window.scrollTo({ top: 0 });
+  });
+
+  // Goals screen
+  document.getElementById('goals-back-btn').addEventListener('click', () => {
+    document.getElementById('goals-screen').classList.add('hidden');
+    document.getElementById('upload-screen').classList.remove('hidden');
+    window.scrollTo({ top: 0 });
+  });
+  document.getElementById('goals-calc-btn').addEventListener('click', calculateGoalPlan);
 
   browseBtn.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('click', (e) => { if (e.target !== browseBtn) fileInput.click(); });
@@ -1585,3 +1634,648 @@ window.addEventListener('load', () => {
   // Small delay to ensure GIS script is initialised
   setTimeout(initGoogleAuth, 300);
 });
+
+// =====================================================================
+// ===== GOAL-BASED PLANNER =====
+// =====================================================================
+
+// Category defaults per spec: inflation (midpoint of documented range),
+// a sensible default horizon, and a starter name. All editable by the user.
+const GOAL_CATEGORIES = [
+  { key: 'House',      icon: '🏠', label: 'House',      inflation: 6.5, horizon: 7,  defaultName: 'House down payment' },
+  { key: 'Car',        icon: '🚗', label: 'Car',        inflation: 4.5, horizon: 4,  defaultName: 'New car' },
+  { key: 'Education',  icon: '🎓', label: 'Education',  inflation: 11,  horizon: 12, defaultName: "Child's education" },
+  { key: 'Wedding',    icon: '💍', label: 'Wedding',    inflation: 9,   horizon: 6,  defaultName: 'Wedding' },
+  { key: 'Vacation',   icon: '✈️', label: 'Vacation',   inflation: 5.5, horizon: 3,  defaultName: 'Dream vacation' },
+  { key: 'Retirement', icon: '🏖️', label: 'Retirement', inflation: 6,   horizon: 25, defaultName: 'Retirement corpus' },
+  { key: 'Custom',     icon: '⭐', label: 'Custom',     inflation: 6,   horizon: 5,  defaultName: 'Custom goal' },
+];
+
+const RISK_RETURN_PRESETS = [
+  { key: 'conservative', label: 'Conservative (debt-heavy)', rate: 7 },
+  { key: 'balanced',     label: 'Balanced (hybrid)',         rate: 10 },
+  { key: 'aggressive',   label: 'Aggressive (equity-heavy)', rate: 12 },
+];
+
+const GOAL_COLORS = ['#6c63ff', '#00d4aa', '#ffa94d', '#ff6584', '#4dabf7', '#e599f7', '#94d82d', '#ffd43b'];
+
+// ===== GOAL STATE =====
+let goals = [];           // Goal objects (see spec §1)
+let goalIdCounter = 0;
+let goalStackedChart = null;
+let goalGrowthChart = null;
+
+function goalCategory(key) {
+  return GOAL_CATEGORIES.find(c => c.key === key) || GOAL_CATEGORIES[GOAL_CATEGORIES.length - 1];
+}
+
+// ===== GOAL CALCULATION ENGINE (spec §2) =====
+
+// a) Future value of the goal (inflation-adjusted target)
+function goalFV(targetAmountToday, inflationRate, years) {
+  return targetAmountToday * Math.pow(1 + inflationRate / 100, years);
+}
+
+// b) Future value of savings already earmarked
+function existingFV(currentSavings, expectedReturnRate, years) {
+  return currentSavings * Math.pow(1 + expectedReturnRate / 100, years);
+}
+
+// c) Required monthly SIP to close the gap (annuity-due closed form)
+function requiredSIP(fvGap, expectedReturnRate, years) {
+  if (fvGap <= 0) return 0;
+  const months = Math.round(years * 12);
+  if (months <= 0) return Infinity;
+  const mr = expectedReturnRate / 100 / 12;
+  if (mr === 0) return fvGap / months;
+  return fvGap / ((((Math.pow(1 + mr, months) - 1) / mr)) * (1 + mr));
+}
+
+// FV of a step-up SIP: contributions at the start of each month, SIP grows
+// by stepUpPercent every 12 months. Matches the annuity-due closed form when
+// stepUpPercent = 0.
+function stepUpSipFV(startSip, stepUpPercent, expectedReturnRate, years) {
+  const mr = expectedReturnRate / 100 / 12;
+  let bal = 0;
+  let sip = startSip;
+  for (let y = 0; y < years; y++) {
+    for (let m = 0; m < 12; m++) bal = (bal + sip) * (1 + mr);
+    sip *= 1 + stepUpPercent / 100;
+  }
+  return bal;
+}
+
+// Solve for the starting SIP of a step-up plan via binary search (spec §2c).
+function requiredSIPStepUp(fvGap, stepUpPercent, expectedReturnRate, years) {
+  if (fvGap <= 0) return 0;
+  if (years <= 0) return Infinity;
+  let lo = 0, hi = 10000000; // ₹0 – ₹1 Cr/month search window
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (stepUpSipFV(mid, stepUpPercent, expectedReturnRate, years) < fvGap) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+// Full per-goal computation. Returns {years, fvGoal, fvExisting, fvGap, requiredMonthly}.
+function computeGoal(g, currentYear) {
+  const years = g.targetYear - currentYear;
+  const fvGoalV = goalFV(g.targetAmountToday, g.inflationRate, years);
+  const fvExistingV = existingFV(g.currentSavings, g.expectedReturnRate, years);
+  const fvGap = Math.max(0, fvGoalV - fvExistingV);
+  const requiredMonthly = g.stepUpPercent > 0
+    ? requiredSIPStepUp(fvGap, g.stepUpPercent, g.expectedReturnRate, years)
+    : requiredSIP(fvGap, g.expectedReturnRate, years);
+  return { ...g, years, fvGoal: fvGoalV, fvExisting: fvExistingV, fvGap, requiredMonthly };
+}
+
+// ===== MULTI-GOAL AGGREGATION & REBALANCING (spec §3) =====
+function computeGoalPlan(surplus, currentYear) {
+  const computed = goals.map(g => computeGoal(g, currentYear));
+  const totalRequired = computed.reduce((s, c) => s + c.requiredMonthly, 0);
+  const hasSurplus = surplus > 0;
+  const allFunded = hasSurplus && totalRequired <= surplus;
+
+  // Fund goals in priority order (1 = first) until surplus is exhausted
+  const sorted = [...computed].sort((a, b) => (a.priority - b.priority) || (a.years - b.years));
+  let remaining = hasSurplus ? surplus : 0;
+  sorted.forEach((c) => {
+    c.allocated = Math.min(c.requiredMonthly, remaining);
+    remaining = Math.max(0, remaining - c.allocated);
+    c.funded = c.allocated >= c.requiredMonthly - 0.5;
+    if (hasSurplus && !c.funded) c.suggestions = buildRebalanceSuggestions(c, c.allocated, currentYear);
+  });
+
+  return { computed, sorted, totalRequired, surplus, hasSurplus, allFunded };
+}
+
+// Rebalancing suggestions for a goal whose required SIP exceeds its available
+// share of the surplus: extend horizon, reduce target, or (clearly labelled
+// higher-risk, never auto-applied) increase expected return.
+function buildRebalanceSuggestions(c, avail, currentYear) {
+  const out = [];
+
+  if (avail <= 0) {
+    out.push({ type: 'none', text: 'No surplus is left after funding higher-priority goals. Lower another goal\'s priority, trim its target, or increase your monthly surplus.' });
+    return out;
+  }
+
+  const sipAt = (years, rate) => {
+    const fvG = goalFV(c.targetAmountToday, c.inflationRate, years);
+    const fvE = existingFV(c.currentSavings, rate, years);
+    const gap = Math.max(0, fvG - fvE);
+    return c.stepUpPercent > 0
+      ? requiredSIPStepUp(gap, c.stepUpPercent, rate, years)
+      : requiredSIP(gap, rate, years);
+  };
+
+  // 1) Extend target_year — smallest extension that makes the goal fit
+  for (let extra = 1; extra <= 40; extra++) {
+    if (sipAt(c.years + extra, c.expectedReturnRate) <= avail) {
+      out.push({
+        type: 'extend',
+        text: `Extend the target by ${extra} year${extra > 1 ? 's' : ''} (to ${currentYear + c.years + extra}) — the SIP then fits in your remaining ${fmt(avail)}/mo.`,
+      });
+      break;
+    }
+  }
+
+  // 2) Reduce target_amount_today — FV is linear in the starting SIP,
+  //    so scale the gap by avail/required.
+  if (c.requiredMonthly > 0 && isFinite(c.requiredMonthly)) {
+    const factor = avail / c.requiredMonthly;
+    const newFvGoal = c.fvExisting + c.fvGap * factor;
+    const newTarget = newFvGoal / Math.pow(1 + c.inflationRate / 100, c.years);
+    const reduction = c.targetAmountToday - newTarget;
+    if (newTarget > 0 && reduction > 0) {
+      out.push({
+        type: 'reduce',
+        text: `Reduce the target by ${fmtCompact(reduction)} (to ${fmtCompact(newTarget)} in today's money) to fit your remaining surplus.`,
+      });
+    }
+  }
+
+  // 3) Increase expected_return_rate — manual, higher-risk option only
+  {
+    let lo = c.expectedReturnRate, hi = 18, found = null;
+    if (sipAt(c.years, hi) <= avail) {
+      for (let i = 0; i < 30; i++) {
+        const mid = (lo + hi) / 2;
+        if (sipAt(c.years, mid) <= avail) { found = mid; hi = mid; } else lo = mid;
+      }
+    }
+    if (found !== null) {
+      out.push({
+        type: 'risk',
+        text: `A more aggressive allocation returning ~${found.toFixed(1)}% p.a. would fit — ⚠️ higher risk: markets may not deliver this; not a default recommendation.`,
+      });
+    }
+  }
+
+  return out;
+}
+
+// ===== GOAL STATE HELPERS =====
+function saveGoalsLocal() {
+  try {
+    localStorage.setItem('corpusplan_goals', JSON.stringify({
+      goals,
+      surplus: parseFormattedInput('goals-surplus') || 0,
+    }));
+  } catch { /* storage full / private mode — non-fatal */ }
+}
+
+function loadGoalsLocal() {
+  try {
+    const raw = localStorage.getItem('corpusplan_goals');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (Array.isArray(data.goals) && data.goals.length) {
+      goals = data.goals;
+      goalIdCounter = Math.max(0, ...goals.map(g => g.id));
+      const surplusEl = document.getElementById('goals-surplus');
+      if (surplusEl && !surplusEl.value && data.surplus) surplusEl.value = fmtInput(data.surplus);
+    }
+  } catch { /* corrupt local state — start fresh */ }
+}
+
+function addGoal(categoryKey) {
+  const cat = goalCategory(categoryKey);
+  const currentYear = new Date().getFullYear();
+
+  // Retirement pre-fill from the shared financial profile: ~25× annual expenses
+  let targetAmount = 0;
+  if (categoryKey === 'Retirement') {
+    const annualExpenses = getAnnualExpenses();
+    if (annualExpenses > 0) targetAmount = Math.round(annualExpenses * 25);
+  }
+
+  goals.push({
+    id: ++goalIdCounter,
+    name: cat.defaultName,
+    category: cat.key,
+    targetAmountToday: targetAmount,
+    targetYear: currentYear + cat.horizon,
+    inflationRate: cat.inflation,
+    currentSavings: 0,
+    monthlyContribution: 0,
+    expectedReturnRate: 10,
+    stepUpPercent: 0,
+    priority: goals.length + 1,
+  });
+  renderGoalCategoryGrid();
+  renderGoalsList();
+  saveGoalsLocal();
+  document.getElementById('goals-results')?.classList.add('hidden');
+  const card = document.getElementById(`goal-card-${goalIdCounter}`);
+  card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function removeGoal(id) {
+  goals = goals.filter(g => g.id !== id);
+  renderGoalCategoryGrid();
+  renderGoalsList();
+  saveGoalsLocal();
+  document.getElementById('goals-results')?.classList.add('hidden');
+}
+
+const GOAL_NUMERIC_FIELDS = new Set([
+  'targetAmountToday', 'targetYear', 'inflationRate', 'currentSavings',
+  'monthlyContribution', 'expectedReturnRate', 'stepUpPercent', 'priority',
+]);
+
+function updateGoalField(id, field, value) {
+  const g = goals.find(x => x.id === id);
+  if (!g) return;
+  g[field] = GOAL_NUMERIC_FIELDS.has(field)
+    ? (parseFloat(String(value).replace(/[^0-9.\-]/g, '')) || 0)
+    : value;
+  saveGoalsLocal();
+}
+
+function setGoalRiskPreset(id, presetKey) {
+  const preset = RISK_RETURN_PRESETS.find(p => p.key === presetKey);
+  if (!preset) return;
+  updateGoalField(id, 'expectedReturnRate', preset.rate);
+  const input = document.getElementById(`goal-return-${id}`);
+  if (input) input.value = preset.rate;
+}
+
+function formatGoalAmountInput(el) {
+  const raw = parseFloat(el.value.replace(/[^0-9.]/g, '')) || 0;
+  el.value = raw ? fmtInput(raw) : '';
+}
+
+// ===== GOALS UI (spec §4) =====
+function openGoalsScreen() {
+  ['upload-screen', 'dashboard-screen', 'planner-screen'].forEach(s =>
+    document.getElementById(s)?.classList.add('hidden'));
+  document.getElementById('goals-screen').classList.remove('hidden');
+  initGoals();
+  window.scrollTo({ top: 0 });
+}
+
+function initGoals() {
+  if (!goals.length) loadGoalsLocal();
+  renderGoalCategoryGrid();
+  prefillGoalSurplus();
+  renderGoalsList();
+
+  const surplusEl = document.getElementById('goals-surplus');
+  if (surplusEl && !surplusEl.dataset.wired) {
+    surplusEl.dataset.wired = '1';
+    attachFormattedInputHandlers('goals-surplus');
+    surplusEl.addEventListener('input', saveGoalsLocal);
+  }
+}
+
+function prefillGoalSurplus() {
+  const el = document.getElementById('goals-surplus');
+  const src = document.getElementById('goals-surplus-source');
+  if (!el) return;
+  if (!el.value && bankData && bankData.monthlyIncome > 0) {
+    const surplus = Math.max(0, Math.round(bankData.monthlyIncome - bankData.monthlyExpenses - bankData.monthlyEMI));
+    el.value = fmtInput(surplus);
+    if (src) src.textContent = '· pre-filled from your bank statement';
+  } else if (src && !el.value) {
+    src.textContent = '';
+  }
+}
+
+function renderGoalCategoryGrid() {
+  const grid = document.getElementById('goal-category-grid');
+  if (!grid) return;
+  grid.innerHTML = GOAL_CATEGORIES.map((cat) => {
+    const count = goals.filter(g => g.category === cat.key).length;
+    return `
+      <button class="goal-cat-card${count ? ' goal-cat-card--active' : ''}" onclick="addGoal('${cat.key}')">
+        ${count ? `<span class="goal-cat-count">${count}</span>` : ''}
+        <span class="goal-cat-icon">${cat.icon}</span>
+        <span class="goal-cat-label">${cat.label}</span>
+        <span class="goal-cat-add">+ Add</span>
+      </button>`;
+  }).join('');
+}
+
+function renderGoalsList() {
+  const section = document.getElementById('goals-list-section');
+  const list = document.getElementById('goals-list');
+  if (!section || !list) return;
+
+  if (!goals.length) {
+    section.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  section.classList.remove('hidden');
+  const showPriority = goals.length > 1;
+
+  list.innerHTML = goals.map((g) => {
+    const cat = goalCategory(g.category);
+    return `
+    <div class="goal-detail-card" id="goal-card-${g.id}">
+      <div class="goal-detail-header">
+        <span class="goal-detail-icon">${cat.icon}</span>
+        <input type="text" class="goal-name-input" value="${escHtml(g.name)}" maxlength="60"
+          oninput="updateGoalField(${g.id}, 'name', this.value)">
+        <span class="goal-cat-chip">${cat.label}</span>
+        ${showPriority ? `
+          <label class="goal-priority-wrap" title="1 = funded first when surplus falls short">
+            Priority
+            <input type="number" class="goal-priority-input" min="1" max="${goals.length}" value="${g.priority}"
+              oninput="updateGoalField(${g.id}, 'priority', this.value)">
+          </label>` : ''}
+        <button class="goal-remove-btn" onclick="removeGoal(${g.id})" title="Remove goal">✕</button>
+      </div>
+      <div class="goal-detail-grid">
+        <div class="form-row">
+          <label>Target Amount (today's ₹)</label>
+          <input type="text" class="form-input" value="${g.targetAmountToday ? fmtInput(g.targetAmountToday) : ''}" placeholder="e.g. 25,00,000"
+            oninput="updateGoalField(${g.id}, 'targetAmountToday', this.value)" onblur="formatGoalAmountInput(this)">
+        </div>
+        <div class="form-row">
+          <label>Target Year</label>
+          <input type="number" class="form-input" min="${new Date().getFullYear() + 1}" max="2100" value="${g.targetYear}"
+            oninput="updateGoalField(${g.id}, 'targetYear', this.value)">
+        </div>
+        <div class="form-row">
+          <label>Inflation (% p.a.)</label>
+          <input type="number" class="form-input" min="0" max="20" step="0.5" value="${g.inflationRate}"
+            oninput="updateGoalField(${g.id}, 'inflationRate', this.value)">
+        </div>
+        <div class="form-row">
+          <label>Current Savings for this goal (₹)</label>
+          <input type="text" class="form-input" value="${g.currentSavings ? fmtInput(g.currentSavings) : ''}" placeholder="0"
+            oninput="updateGoalField(${g.id}, 'currentSavings', this.value)" onblur="formatGoalAmountInput(this)">
+        </div>
+        <div class="form-row">
+          <label>Current Monthly SIP toward it (₹)</label>
+          <input type="text" class="form-input" value="${g.monthlyContribution ? fmtInput(g.monthlyContribution) : ''}" placeholder="0"
+            oninput="updateGoalField(${g.id}, 'monthlyContribution', this.value)" onblur="formatGoalAmountInput(this)">
+        </div>
+        <div class="form-row">
+          <label>Expected Return (% p.a.)</label>
+          <div class="goal-return-row">
+            <input type="number" id="goal-return-${g.id}" class="form-input" min="0" max="30" step="0.5" value="${g.expectedReturnRate}"
+              oninput="updateGoalField(${g.id}, 'expectedReturnRate', this.value)">
+            <select class="goal-risk-select" onchange="setGoalRiskPreset(${g.id}, this.value)" title="Risk profile preset">
+              <option value="">Preset…</option>
+              ${RISK_RETURN_PRESETS.map(p => `<option value="${p.key}"${p.rate === g.expectedReturnRate ? ' selected' : ''}>${p.label} · ${p.rate}%</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+      <details class="goal-advanced"${g.stepUpPercent ? ' open' : ''}>
+        <summary>Advanced — annual SIP step-up</summary>
+        <div class="form-row goal-stepup-row">
+          <label>Step-up (% increase in SIP per year)</label>
+          <input type="number" class="form-input" min="0" max="25" step="1" value="${g.stepUpPercent}"
+            oninput="updateGoalField(${g.id}, 'stepUpPercent', this.value)">
+        </div>
+      </details>
+    </div>`;
+  }).join('');
+}
+
+// ===== RESULTS (spec §4 step 3–4) =====
+function calculateGoalPlan() {
+  if (!goals.length) { showPlannerToast('Add at least one goal first.'); return; }
+  const currentYear = new Date().getFullYear();
+
+  for (const g of goals) {
+    if (!g.targetAmountToday || g.targetAmountToday <= 0) {
+      showPlannerToast(`"${g.name}" needs a target amount.`);
+      document.getElementById(`goal-card-${g.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!g.targetYear || g.targetYear <= currentYear) {
+      showPlannerToast(`"${g.name}" needs a target year after ${currentYear}.`);
+      document.getElementById(`goal-card-${g.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
+
+  const surplus = parseFormattedInput('goals-surplus') || 0;
+  const plan = computeGoalPlan(surplus, currentYear);
+
+  renderGoalSummary(plan);
+  renderGoalResultCards(plan);
+  renderGoalStackedChart(plan, currentYear);
+  renderGoalTimeline(plan);
+  renderGoalGrowthChart(plan, currentYear);
+
+  const results = document.getElementById('goals-results');
+  results.classList.remove('hidden');
+  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  saveGoalsLocal();
+}
+
+function fmtCompact(n) {
+  if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr';
+  if (n >= 1e5) return '₹' + (n / 1e5).toFixed(1) + ' L';
+  return fmt(n);
+}
+
+function renderGoalSummary(plan) {
+  const el = document.getElementById('goals-summary-card');
+  if (!el) return;
+  const { totalRequired, surplus, hasSurplus, allFunded } = plan;
+  const pctUsed = hasSurplus ? Math.min(100, (totalRequired / surplus) * 100) : 0;
+  const over = hasSurplus && totalRequired > surplus;
+
+  let verdict;
+  if (!hasSurplus) {
+    verdict = `<span class="goal-verdict goal-verdict--info">ℹ️ Enter your monthly surplus above to check affordability &amp; get rebalancing suggestions.</span>`;
+  } else if (allFunded) {
+    verdict = `<span class="goal-verdict goal-verdict--ok">✓ All goals fit — you have ${fmt(surplus - totalRequired)}/mo to spare.</span>`;
+  } else {
+    verdict = `<span class="goal-verdict goal-verdict--warn">⚠️ Required SIP exceeds your surplus by ${fmt(totalRequired - surplus)}/mo — see per-goal suggestions below.</span>`;
+  }
+
+  el.innerHTML = `
+    <h2 class="card-title">Combined Plan Summary</h2>
+    <div class="goal-summary-strip">
+      <div class="goal-summary-stat">
+        <div class="goal-summary-label">Total Required SIP</div>
+        <div class="goal-summary-value" style="color:${over ? 'var(--expense)' : 'var(--accent)'}">${fmt(totalRequired)}<span class="goal-summary-unit">/mo</span></div>
+      </div>
+      <div class="goal-summary-stat">
+        <div class="goal-summary-label">Available Surplus</div>
+        <div class="goal-summary-value" style="color:var(--income)">${hasSurplus ? fmt(surplus) : '—'}<span class="goal-summary-unit">${hasSurplus ? '/mo' : ''}</span></div>
+      </div>
+      <div class="goal-summary-stat">
+        <div class="goal-summary-label">Goals</div>
+        <div class="goal-summary-value">${plan.computed.length}</div>
+      </div>
+    </div>
+    ${hasSurplus ? `
+    <div class="goal-progress-track">
+      <div class="goal-progress-fill${over ? ' goal-progress-fill--over' : ''}" style="width:${pctUsed}%"></div>
+    </div>
+    <div class="goal-progress-caption">${fmt(totalRequired)} of ${fmt(surplus)} monthly surplus ${over ? 'needed (over budget)' : 'used'}</div>` : ''}
+    <div class="goal-verdict-row">${verdict}</div>
+  `;
+}
+
+function renderGoalResultCards(plan) {
+  const wrap = document.getElementById('goals-result-cards');
+  if (!wrap) return;
+
+  wrap.innerHTML = plan.sorted.map((c) => {
+    const cat = goalCategory(c.category);
+    const idx = plan.computed.findIndex(g => g.id === c.id);
+    const color = GOAL_COLORS[idx % GOAL_COLORS.length];
+
+    let badge;
+    if (!plan.hasSurplus) badge = '';
+    else if (c.funded) badge = '<span class="badge-ok">✓ Fundable</span>';
+    else if (c.allocated > 0) badge = '<span class="badge-warn">⚠️ Partially funded</span>';
+    else badge = '<span class="badge-warn">⚠️ Unfunded</span>';
+
+    const contribution = c.monthlyContribution || 0;
+    const delta = c.requiredMonthly - contribution;
+    const contribNote = contribution > 0
+      ? (delta <= 0.5
+          ? `<div class="goal-contrib-note goal-contrib-note--ok">Your current SIP of ${fmt(contribution)}/mo already covers this goal.</div>`
+          : `<div class="goal-contrib-note">You currently invest ${fmt(contribution)}/mo — increase by ${fmt(delta)}/mo to stay on track.</div>`)
+      : '';
+
+    const suggestions = (c.suggestions && c.suggestions.length)
+      ? `<div class="goal-suggestions">
+           <div class="goal-suggestions-title">How to make it fit</div>
+           ${c.suggestions.map(s => `<div class="goal-suggestion goal-suggestion--${s.type}">${s.text}</div>`).join('')}
+         </div>`
+      : '';
+
+    return `
+    <div class="card goal-result-card" style="border-top: 3px solid ${color}">
+      <div class="goal-result-head">
+        <span class="goal-detail-icon">${cat.icon}</span>
+        <div class="goal-result-name">${escHtml(c.name)}</div>
+        ${badge}
+      </div>
+      <div class="goal-result-sip">
+        ${isFinite(c.requiredMonthly) ? fmt(c.requiredMonthly) : '—'}<span class="goal-summary-unit">/mo required</span>
+      </div>
+      <div class="goal-result-facts">
+        <div><span>Target (today)</span><strong>${fmtCompact(c.targetAmountToday)}</strong></div>
+        <div><span>Target in ${c.targetYear} (@ ${c.inflationRate}% infl.)</span><strong>${fmtCompact(c.fvGoal)}</strong></div>
+        <div><span>Existing savings will grow to</span><strong>${fmtCompact(c.fvExisting)}</strong></div>
+        <div><span>Gap to fund</span><strong>${fmtCompact(c.fvGap)}</strong></div>
+        <div><span>Horizon</span><strong>${c.years} yr${c.years !== 1 ? 's' : ''} @ ${c.expectedReturnRate}% return${c.stepUpPercent ? ` · ${c.stepUpPercent}% step-up` : ''}</strong></div>
+        ${plan.hasSurplus && !c.funded ? `<div><span>Allocated from surplus</span><strong>${fmt(c.allocated)}/mo</strong></div>` : ''}
+      </div>
+      ${contribNote}
+      ${suggestions}
+    </div>`;
+  }).join('');
+}
+
+// Per-year SIP for a goal (step-up applied annually); yearOffset 0 = this year.
+function goalSipInYear(c, yearOffset) {
+  if (!isFinite(c.requiredMonthly)) return 0;
+  if (yearOffset >= c.years) return 0;
+  return c.requiredMonthly * Math.pow(1 + c.stepUpPercent / 100, yearOffset);
+}
+
+function renderGoalStackedChart(plan, currentYear) {
+  const canvas = document.getElementById('goals-stacked-chart');
+  if (!canvas) return;
+  const maxYears = Math.max(...plan.computed.map(c => c.years));
+  const labels = Array.from({ length: maxYears }, (_, i) => String(currentYear + i));
+
+  const datasets = plan.computed.map((c, i) => ({
+    label: c.name,
+    data: labels.map((_, y) => Math.round(goalSipInYear(c, y))),
+    backgroundColor: GOAL_COLORS[i % GOAL_COLORS.length],
+    borderRadius: 3,
+  }));
+
+  if (goalStackedChart) goalStackedChart.destroy();
+  goalStackedChart = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, grid: { color: 'rgba(46,50,71,.5)' }, ticks: { color: '#8b90a7' } },
+        y: { stacked: true, grid: { color: 'rgba(46,50,71,.5)' }, ticks: { color: '#8b90a7', callback: v => fmtCompact(v) } },
+      },
+      plugins: {
+        legend: { labels: { color: '#e8eaf0' } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.raw)}/mo` } },
+      },
+    },
+  });
+}
+
+function renderGoalTimeline(plan) {
+  const el = document.getElementById('goals-timeline');
+  if (!el) return;
+  const sorted = [...plan.computed].sort((a, b) => a.targetYear - b.targetYear);
+  el.innerHTML = `<div class="goal-timeline">` + sorted.map((c) => {
+    const idx = plan.computed.findIndex(g => g.id === c.id);
+    const color = GOAL_COLORS[idx % GOAL_COLORS.length];
+    const cat = goalCategory(c.category);
+    const badge = !plan.hasSurplus ? ''
+      : c.funded ? '<span class="badge-ok">✓ Fundable</span>'
+      : '<span class="badge-warn">⚠️ Needs rebalancing</span>';
+    return `
+      <div class="goal-timeline-item">
+        <div class="gt-year" style="color:${color}">${c.targetYear}</div>
+        <div class="gt-line"><span class="gt-dot" style="background:${color}"></span></div>
+        <div class="gt-body">
+          <div class="gt-name">${cat.icon} ${escHtml(c.name)} ${badge}</div>
+          <div class="gt-meta">${fmtCompact(c.fvGoal)} needed · ${c.years} yr${c.years !== 1 ? 's' : ''} away · SIP ${isFinite(c.requiredMonthly) ? fmt(c.requiredMonthly) : '—'}/mo</div>
+        </div>
+      </div>`;
+  }).join('') + `</div>`;
+}
+
+function renderGoalGrowthChart(plan, currentYear) {
+  const canvas = document.getElementById('goals-growth-chart');
+  if (!canvas) return;
+  const maxYears = Math.max(...plan.computed.map(c => c.years));
+  const labels = Array.from({ length: maxYears + 1 }, (_, i) => String(currentYear + i));
+
+  const datasets = plan.computed.map((c, i) => {
+    const mr = c.expectedReturnRate / 100 / 12;
+    const data = [Math.round(c.currentSavings)];
+    let bal = c.currentSavings;
+    let sip = isFinite(c.requiredMonthly) ? c.requiredMonthly : 0;
+    for (let y = 0; y < c.years; y++) {
+      for (let m = 0; m < 12; m++) bal = (bal + sip) * (1 + mr);
+      sip *= 1 + c.stepUpPercent / 100;
+      data.push(Math.round(bal));
+    }
+    return {
+      label: c.name,
+      data,
+      borderColor: GOAL_COLORS[i % GOAL_COLORS.length],
+      backgroundColor: GOAL_COLORS[i % GOAL_COLORS.length] + '22',
+      tension: 0.3,
+      pointRadius: 2,
+      spanGaps: false,
+    };
+  });
+
+  if (goalGrowthChart) goalGrowthChart.destroy();
+  goalGrowthChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: 'rgba(46,50,71,.5)' }, ticks: { color: '#8b90a7' } },
+        y: { grid: { color: 'rgba(46,50,71,.5)' }, ticks: { color: '#8b90a7', callback: v => fmtCompact(v) } },
+      },
+      plugins: {
+        legend: { labels: { color: '#e8eaf0' } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.raw)}` } },
+      },
+    },
+  });
+}
