@@ -28,6 +28,7 @@
     </div>
     <div class="site-nav-links">
       <button class="nav-link" id="nav-home">Home</button>
+      <button class="nav-link hidden" id="nav-dashboard">📊 Dashboard</button>
       <button class="nav-link" id="nav-goals">🎯 Goals</button>
       <button class="nav-link" id="nav-retirement">Retirement</button>
     </div>
@@ -231,6 +232,15 @@
           <p class="home-option-desc">Deep-dive retirement projection: enter income, expenses, EMI, and your corpus across asset classes for a year-by-year accumulation &amp; drawdown table.</p>
           <button class="btn-outline home-option-btn" id="manual-btn">Start Planning →</button>
         </div>
+      </div>
+
+      <!-- Statement analysis banner — visible after a statement has been analysed -->
+      <div id="home-dashboard-banner" class="hidden home-dash-banner">
+        <div class="home-dash-banner-text">
+          <div class="home-dash-banner-title">📊 Your statement analysis is ready</div>
+          <div class="home-dash-banner-meta" id="home-dash-banner-meta"></div>
+        </div>
+        <button class="btn-primary" id="home-dash-banner-btn">View Dashboard →</button>
       </div>
 
       <!-- My Plans Section — visible only when logged in with saved plans -->

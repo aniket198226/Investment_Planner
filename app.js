@@ -233,6 +233,7 @@ function signOut() {
   currentPlanId   = null;
   currentPlanName = null;
   bankData        = null;
+  clearDashboardAccess();
   localStorage.removeItem('corpusplan_auth');
   if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
 
@@ -892,9 +893,30 @@ function renderDashboard(monthlyMap, fileName) {
     monthlyInvestment: avg.investment,
   };
 
+  // Expose ways back to this analysis: nav link + home-page banner
+  document.getElementById('nav-dashboard')?.classList.remove('hidden');
+  const banner = document.getElementById('home-dashboard-banner');
+  if (banner) {
+    banner.classList.remove('hidden');
+    document.getElementById('home-dash-banner-meta').textContent =
+      `${fileName} · ${numMonths} month${numMonths !== 1 ? 's' : ''} analysed · avg income ${fmt(avg.income)}/mo`;
+  }
+
   // Switch screens
-  document.getElementById('upload-screen').classList.add('hidden');
+  showDashboardScreen();
+}
+
+function showDashboardScreen() {
+  if (!bankData) return;
+  ['upload-screen', 'planner-screen', 'goals-screen'].forEach(s =>
+    document.getElementById(s)?.classList.add('hidden'));
   document.getElementById('dashboard-screen').classList.remove('hidden');
+  window.scrollTo({ top: 0 });
+}
+
+function clearDashboardAccess() {
+  document.getElementById('nav-dashboard')?.classList.add('hidden');
+  document.getElementById('home-dashboard-banner')?.classList.add('hidden');
 }
 
 // ===== PIE CHART =====
@@ -1062,6 +1084,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('upload-screen').classList.remove('hidden');
     window.scrollTo({ top: 0 });
   });
+  document.getElementById('nav-dashboard').addEventListener('click', showDashboardScreen);
+  document.getElementById('home-dash-banner-btn').addEventListener('click', showDashboardScreen);
   document.getElementById('nav-goals').addEventListener('click', openGoalsScreen);
   document.getElementById('nav-retirement').addEventListener('click', () => {
     ['upload-screen', 'dashboard-screen', 'goals-screen'].forEach(s =>
@@ -1100,6 +1124,7 @@ document.addEventListener('DOMContentLoaded', () => {
   resetBtn.addEventListener('click', () => {
     fileInput.value = '';
     bankData = null;
+    clearDashboardAccess();
     document.getElementById('upload-screen').classList.remove('hidden');
     document.getElementById('dashboard-screen').classList.add('hidden');
     document.getElementById('upload-error').classList.add('hidden');
@@ -1127,6 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function manualEntry() {
   bankData = null;
+  clearDashboardAccess();
   document.getElementById('upload-screen').classList.add('hidden');
   document.getElementById('planner-screen').classList.remove('hidden');
   initPlanner();

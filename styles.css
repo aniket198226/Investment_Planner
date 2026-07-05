@@ -1644,3 +1644,19 @@ tfoot td {
   .goal-result-grid { grid-template-columns: 1fr; }
   .goals-chart-wrap { height: 260px; }
 }
+
+/* Home-page banner linking back to the statement analysis dashboard */
+.home-dash-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: linear-gradient(90deg, rgba(0,212,170,0.1), rgba(108,99,255,0.08));
+  border: 1px solid rgba(0,212,170,0.35);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+}
+.home-dash-banner-title { font-weight: 700; font-size: .95rem; }
+.home-dash-banner-meta { color: var(--text-muted); font-size: .82rem; margin-top: 2px; }
