@@ -1673,7 +1673,6 @@ const GOAL_CATEGORIES = [
   { key: 'Education',  icon: '🎓', label: 'Education',  inflation: 11,  horizon: 12, defaultName: "Child's education" },
   { key: 'Wedding',    icon: '💍', label: 'Wedding',    inflation: 9,   horizon: 6,  defaultName: 'Wedding' },
   { key: 'Vacation',   icon: '✈️', label: 'Vacation',   inflation: 5.5, horizon: 3,  defaultName: 'Dream vacation' },
-  { key: 'Retirement', icon: '🏖️', label: 'Retirement', inflation: 6,   horizon: 25, defaultName: 'Retirement corpus' },
   { key: 'Custom',     icon: '⭐', label: 'Custom',     inflation: 6,   horizon: 5,  defaultName: 'Custom goal' },
 ];
 
@@ -1870,18 +1869,11 @@ function addGoal(categoryKey) {
   const cat = goalCategory(categoryKey);
   const currentYear = new Date().getFullYear();
 
-  // Retirement pre-fill from the shared financial profile: ~25× annual expenses
-  let targetAmount = 0;
-  if (categoryKey === 'Retirement') {
-    const annualExpenses = getAnnualExpenses();
-    if (annualExpenses > 0) targetAmount = Math.round(annualExpenses * 25);
-  }
-
   goals.push({
     id: ++goalIdCounter,
     name: cat.defaultName,
     category: cat.key,
-    targetAmountToday: targetAmount,
+    targetAmountToday: 0,
     targetYear: currentYear + cat.horizon,
     inflationRate: cat.inflation,
     currentSavings: 0,
