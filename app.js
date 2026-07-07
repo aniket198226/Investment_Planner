@@ -1682,6 +1682,17 @@ const RISK_RETURN_PRESETS = [
   { key: 'aggressive',   label: 'Aggressive (equity-heavy)', rate: 12 },
 ];
 
+// Industry-standard financing defaults per category: typical down-payment %,
+// prevailing loan interest rate, and common tenure. All editable by the user.
+const GOAL_LOAN_DEFAULTS = {
+  House:     { dpPct: 20, rate: 8.5,  tenure: 20 },  // home loan
+  Car:       { dpPct: 15, rate: 9.5,  tenure: 5 },   // car loan
+  Education: { dpPct: 15, rate: 10.5, tenure: 10 },  // education loan
+  Wedding:   { dpPct: 25, rate: 12,   tenure: 5 },   // personal loan
+  Vacation:  { dpPct: 25, rate: 12,   tenure: 3 },   // personal loan
+  Custom:    { dpPct: 20, rate: 11,   tenure: 5 },
+};
+
 const GOAL_COLORS = ['#6c63ff', '#00d4aa', '#ffa94d', '#ff6584', '#4dabf7', '#e599f7', '#94d82d', '#ffd43b'];
 
 // ===== GOAL STATE =====
@@ -1743,16 +1754,39 @@ function requiredSIPStepUp(fvGap, stepUpPercent, expectedReturnRate, years) {
   return (lo + hi) / 2;
 }
 
-// Full per-goal computation. Returns {years, fvGoal, fvExisting, fvGap, requiredMonthly}.
+// Standard reducing-balance EMI: P × r × (1+r)^n / ((1+r)^n − 1)
+function loanEMI(principal, annualRate, tenureYears) {
+  const n = Math.round(tenureYears * 12);
+  if (principal <= 0 || n <= 0) return 0;
+  const r = annualRate / 100 / 12;
+  if (r === 0) return principal / n;
+  const f = Math.pow(1 + r, n);
+  if (!isFinite(f)) return principal * r; // very long tenure → interest-only limit
+  return principal * r * f / (f - 1);
+}
+
+// Loan principal at purchase: the deficit (total value − down payment, both in
+// today's ₹) inflated to the target year, when the loan is actually taken.
+function derivedLoanAmount(g) {
+  const years = Math.max(0, g.targetYear - new Date().getFullYear());
+  const deficit = Math.max(0, (g.targetAmountToday || 0) - (g.downPaymentToday || 0));
+  return Math.round(deficit * Math.pow(1 + (g.inflationRate || 0) / 100, years));
+}
+
+// Full per-goal computation. When financed, the SIP saves toward the down
+// payment only; the rest is covered by the loan (EMI starts at purchase).
 function computeGoal(g, currentYear) {
   const years = g.targetYear - currentYear;
-  const fvGoalV = goalFV(g.targetAmountToday, g.inflationRate, years);
+  const savingsTarget = g.useLoan ? (g.downPaymentToday || 0) : g.targetAmountToday;
+  const fvGoalV = goalFV(savingsTarget, g.inflationRate, years);
   const fvExistingV = existingFV(g.currentSavings, g.expectedReturnRate, years);
   const fvGap = Math.max(0, fvGoalV - fvExistingV);
   const requiredMonthly = g.stepUpPercent > 0
     ? requiredSIPStepUp(fvGap, g.stepUpPercent, g.expectedReturnRate, years)
     : requiredSIP(fvGap, g.expectedReturnRate, years);
-  return { ...g, years, fvGoal: fvGoalV, fvExisting: fvExistingV, fvGap, requiredMonthly };
+  const loanAmount = g.useLoan ? (g.loanAmount || 0) : 0;
+  const emi = g.useLoan ? loanEMI(loanAmount, g.loanRate || 0, g.loanTenure || 0) : 0;
+  return { ...g, years, savingsTarget, fvGoal: fvGoalV, fvExisting: fvExistingV, fvGap, requiredMonthly, loanAmount, emi };
 }
 
 // ===== MULTI-GOAL AGGREGATION & REBALANCING (spec §3) =====
@@ -1787,7 +1821,7 @@ function buildRebalanceSuggestions(c, avail, currentYear) {
   }
 
   const sipAt = (years, rate) => {
-    const fvG = goalFV(c.targetAmountToday, c.inflationRate, years);
+    const fvG = goalFV(c.savingsTarget, c.inflationRate, years);
     const fvE = existingFV(c.currentSavings, rate, years);
     const gap = Math.max(0, fvG - fvE);
     return c.stepUpPercent > 0
@@ -1812,11 +1846,13 @@ function buildRebalanceSuggestions(c, avail, currentYear) {
     const factor = avail / c.requiredMonthly;
     const newFvGoal = c.fvExisting + c.fvGap * factor;
     const newTarget = newFvGoal / Math.pow(1 + c.inflationRate / 100, c.years);
-    const reduction = c.targetAmountToday - newTarget;
+    const reduction = c.savingsTarget - newTarget;
     if (newTarget > 0 && reduction > 0) {
       out.push({
         type: 'reduce',
-        text: `Reduce the target by ${fmtCompact(reduction)} (to ${fmtCompact(newTarget)} in today's money) to fit your remaining surplus.`,
+        text: c.useLoan
+          ? `Reduce the down payment by ${fmtCompact(reduction)} (to ${fmtCompact(newTarget)} in today's money) — note the loan amount rises to cover the difference.`
+          : `Reduce the target by ${fmtCompact(reduction)} (to ${fmtCompact(newTarget)} in today's money) to fit your remaining surplus.`,
       });
     }
   }
@@ -1881,6 +1917,11 @@ function addGoal(categoryKey) {
     expectedReturnRate: 10,
     stepUpPercent: 0,
     priority: goals.length + 1,
+    useLoan: false,
+    downPaymentToday: 0,
+    loanAmount: 0,
+    loanRate: (GOAL_LOAN_DEFAULTS[cat.key] || GOAL_LOAN_DEFAULTS.Custom).rate,
+    loanTenure: (GOAL_LOAN_DEFAULTS[cat.key] || GOAL_LOAN_DEFAULTS.Custom).tenure,
   });
   renderGoalCategoryGrid();
   renderGoalsList();
@@ -1901,7 +1942,12 @@ function removeGoal(id) {
 const GOAL_NUMERIC_FIELDS = new Set([
   'targetAmountToday', 'targetYear', 'inflationRate', 'currentSavings',
   'monthlyContribution', 'expectedReturnRate', 'stepUpPercent', 'priority',
+  'downPaymentToday', 'loanAmount', 'loanRate', 'loanTenure',
 ]);
+
+// Fields whose change shifts the financing deficit → re-derive the loan amount
+const LOAN_DRIVING_FIELDS = new Set(['targetAmountToday', 'downPaymentToday', 'inflationRate', 'targetYear']);
+const LOAN_TERM_FIELDS    = new Set(['loanAmount', 'loanRate', 'loanTenure']);
 
 function updateGoalField(id, field, value) {
   const g = goals.find(x => x.id === id);
@@ -1909,7 +1955,57 @@ function updateGoalField(id, field, value) {
   g[field] = GOAL_NUMERIC_FIELDS.has(field)
     ? (parseFloat(String(value).replace(/[^0-9.\-]/g, '')) || 0)
     : value;
+  if (g.useLoan) {
+    if (LOAN_DRIVING_FIELDS.has(field)) {
+      g.loanAmount = derivedLoanAmount(g);
+      refreshGoalLoanUI(id);
+    } else if (LOAN_TERM_FIELDS.has(field)) {
+      // Don't rewrite the input the user is typing into
+      refreshGoalLoanUI(id, field === 'loanAmount');
+    }
+  }
   saveGoalsLocal();
+}
+
+function toggleGoalLoan(id, checked) {
+  const g = goals.find(x => x.id === id);
+  if (!g) return;
+  g.useLoan = checked;
+  if (checked) {
+    const def = GOAL_LOAN_DEFAULTS[g.category] || GOAL_LOAN_DEFAULTS.Custom;
+    if (!g.downPaymentToday) g.downPaymentToday = Math.round((g.targetAmountToday || 0) * def.dpPct / 100);
+    if (!g.loanRate) g.loanRate = def.rate;
+    if (!g.loanTenure) g.loanTenure = def.tenure;
+    g.loanAmount = derivedLoanAmount(g);
+  }
+  saveGoalsLocal();
+  renderGoalsList();
+  document.getElementById('goals-results')?.classList.add('hidden');
+}
+
+// Live loan panel refresh: loan-amount input + EMI preview with surplus check
+function refreshGoalLoanUI(id, skipAmountInput = false) {
+  const g = goals.find(x => x.id === id);
+  if (!g || !g.useLoan) return;
+  if (!skipAmountInput) {
+    const amtEl = document.getElementById(`goal-loanamt-${id}`);
+    if (amtEl) amtEl.value = g.loanAmount ? fmtInput(g.loanAmount) : '';
+  }
+  const emiEl = document.getElementById(`goal-emi-${id}`);
+  if (!emiEl) return;
+  const emi = loanEMI(g.loanAmount || 0, g.loanRate || 0, g.loanTenure || 0);
+  const surplus = parseFormattedInput('goals-surplus') || 0;
+  const over = surplus > 0 && emi > surplus;
+  emiEl.className = 'goal-emi-preview' + (over ? ' goal-emi-preview--warn' : '');
+  if (emi <= 0) {
+    emiEl.innerHTML = 'No loan needed — the down payment covers the full goal value.';
+  } else {
+    emiEl.innerHTML =
+      `Loan EMI: <strong>${fmt(emi)}/mo</strong> for ${g.loanTenure} yrs, starting at purchase in ${g.targetYear}` +
+      (over
+        ? `<br>⚠️ This EMI exceeds your monthly surplus of ${fmt(surplus)} — revise the financing terms (larger down payment, longer tenure, or lower rate).`
+        : '');
+  }
 }
 
 function setGoalRiskPreset(id, presetKey) {
@@ -1944,7 +2040,10 @@ function initGoals() {
   if (surplusEl && !surplusEl.dataset.wired) {
     surplusEl.dataset.wired = '1';
     attachFormattedInputHandlers('goals-surplus');
-    surplusEl.addEventListener('input', saveGoalsLocal);
+    surplusEl.addEventListener('input', () => {
+      saveGoalsLocal();
+      goals.filter(g => g.useLoan).forEach(g => refreshGoalLoanUI(g.id, true));
+    });
   }
 }
 
@@ -2008,7 +2107,7 @@ function renderGoalsList() {
       </div>
       <div class="goal-detail-grid">
         <div class="form-row">
-          <label>Target Amount (today's ₹)</label>
+          <label>Total Goal Value (today's ₹)</label>
           <input type="text" class="form-input" value="${g.targetAmountToday ? fmtInput(g.targetAmountToday) : ''}" placeholder="e.g. 25,00,000"
             oninput="updateGoalField(${g.id}, 'targetAmountToday', this.value)" onblur="formatGoalAmountInput(this)">
         </div>
@@ -2044,6 +2143,38 @@ function renderGoalsList() {
           </div>
         </div>
       </div>
+      <div class="goal-loan-section">
+        <label class="goal-loan-toggle">
+          <input type="checkbox" ${g.useLoan ? 'checked' : ''} onchange="toggleGoalLoan(${g.id}, this.checked)">
+          🏦 Finance part of this goal with a loan
+        </label>
+        ${g.useLoan ? `
+        <div class="goal-loan-panel">
+          <div class="goal-detail-grid">
+            <div class="form-row">
+              <label>Down Payment you'll save (today's ₹)</label>
+              <input type="text" class="form-input" value="${g.downPaymentToday ? fmtInput(g.downPaymentToday) : ''}" placeholder="0"
+                oninput="updateGoalField(${g.id}, 'downPaymentToday', this.value)" onblur="formatGoalAmountInput(this)">
+            </div>
+            <div class="form-row">
+              <label>Loan Amount (₹ at purchase, ${g.targetYear})</label>
+              <input type="text" class="form-input" id="goal-loanamt-${g.id}" value="${g.loanAmount ? fmtInput(g.loanAmount) : ''}" placeholder="auto from deficit"
+                oninput="updateGoalField(${g.id}, 'loanAmount', this.value)" onblur="formatGoalAmountInput(this)">
+            </div>
+            <div class="form-row">
+              <label>Interest Rate (% p.a.)</label>
+              <input type="number" class="form-input" min="0" max="30" step="0.25" value="${g.loanRate}"
+                oninput="updateGoalField(${g.id}, 'loanRate', this.value)">
+            </div>
+            <div class="form-row">
+              <label>Loan Tenure (years)</label>
+              <input type="number" class="form-input" min="1" max="35" step="1" value="${g.loanTenure}"
+                oninput="updateGoalField(${g.id}, 'loanTenure', this.value)">
+            </div>
+          </div>
+          <div class="goal-emi-preview" id="goal-emi-${g.id}"></div>
+        </div>` : ''}
+      </div>
       <details class="goal-advanced"${g.stepUpPercent ? ' open' : ''}>
         <summary>Advanced — annual SIP step-up</summary>
         <div class="form-row goal-stepup-row">
@@ -2054,6 +2185,9 @@ function renderGoalsList() {
       </details>
     </div>`;
   }).join('');
+
+  // Populate the live EMI previews after the DOM is in place
+  goals.filter(g => g.useLoan).forEach(g => refreshGoalLoanUI(g.id));
 }
 
 // ===== RESULTS (spec §4 step 3–4) =====
@@ -2072,10 +2206,29 @@ function calculateGoalPlan() {
       document.getElementById(`goal-card-${g.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+    if (g.useLoan && (g.downPaymentToday || 0) > g.targetAmountToday) {
+      showPlannerToast(`"${g.name}": the down payment is more than the total goal value — reduce it or untick financing.`);
+      document.getElementById(`goal-card-${g.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
   }
 
   const surplus = parseFormattedInput('goals-surplus') || 0;
   const plan = computeGoalPlan(surplus, currentYear);
+
+  // Financing check: an EMI that exceeds the monthly surplus can never be
+  // serviced — ask the user to revise the terms before proceeding.
+  if (surplus > 0) {
+    const unserviceable = plan.computed.find(c => c.useLoan && c.emi > surplus);
+    if (unserviceable) {
+      showPlannerToast(
+        `Loan EMI for "${unserviceable.name}" (${fmt(unserviceable.emi)}/mo) exceeds your monthly surplus of ${fmt(surplus)}. ` +
+        `Revise the financing terms — larger down payment, longer tenure, or lower rate — to manage within your surplus.`
+      );
+      document.getElementById(`goal-card-${unserviceable.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+  }
 
   renderGoalSummary(plan);
   renderGoalResultCards(plan);
@@ -2177,13 +2330,24 @@ function renderGoalResultCards(plan) {
         ${isFinite(c.requiredMonthly) ? fmt(c.requiredMonthly) : '—'}<span class="goal-summary-unit">/mo required</span>
       </div>
       <div class="goal-result-facts">
+        ${c.useLoan ? `
+        <div><span>Total value (today)</span><strong>${fmtCompact(c.targetAmountToday)}</strong></div>
+        <div><span>Down payment (today)</span><strong>${fmtCompact(c.savingsTarget)}</strong></div>
+        <div><span>Down payment in ${c.targetYear} (@ ${c.inflationRate}% infl.)</span><strong>${fmtCompact(c.fvGoal)}</strong></div>
+        ` : `
         <div><span>Target (today)</span><strong>${fmtCompact(c.targetAmountToday)}</strong></div>
         <div><span>Target in ${c.targetYear} (@ ${c.inflationRate}% infl.)</span><strong>${fmtCompact(c.fvGoal)}</strong></div>
+        `}
         <div><span>Existing savings will grow to</span><strong>${fmtCompact(c.fvExisting)}</strong></div>
         <div><span>Gap to fund</span><strong>${fmtCompact(c.fvGap)}</strong></div>
         <div><span>Horizon</span><strong>${c.years} yr${c.years !== 1 ? 's' : ''} @ ${c.expectedReturnRate}% return${c.stepUpPercent ? ` · ${c.stepUpPercent}% step-up` : ''}</strong></div>
+        ${c.useLoan ? `
+        <div><span>Loan at purchase (${c.targetYear})</span><strong>${fmtCompact(c.loanAmount)}</strong></div>
+        <div><span>Loan EMI (${c.loanTenure} yrs @ ${c.loanRate}%)</span><strong>${fmt(c.emi)}/mo</strong></div>
+        ` : ''}
         ${plan.hasSurplus && !c.funded ? `<div><span>Allocated from surplus</span><strong>${fmt(c.allocated)}/mo</strong></div>` : ''}
       </div>
+      ${c.useLoan && c.emi > 0 ? `<div class="goal-contrib-note">🏦 The ${fmt(c.emi)}/mo EMI starts after the purchase in ${c.targetYear} — your SIP toward this goal stops then, freeing up ${isFinite(c.requiredMonthly) ? fmt(c.requiredMonthly) : '—'}/mo of it.</div>` : ''}
       ${contribNote}
       ${suggestions}
     </div>`;
@@ -2246,7 +2410,9 @@ function renderGoalTimeline(plan) {
         <div class="gt-line"><span class="gt-dot" style="background:${color}"></span></div>
         <div class="gt-body">
           <div class="gt-name">${cat.icon} ${escHtml(c.name)} ${badge}</div>
-          <div class="gt-meta">${fmtCompact(c.fvGoal)} needed · ${c.years} yr${c.years !== 1 ? 's' : ''} away · SIP ${isFinite(c.requiredMonthly) ? fmt(c.requiredMonthly) : '—'}/mo</div>
+          <div class="gt-meta">${c.useLoan
+            ? `${fmtCompact(c.fvGoal)} down payment + ${fmtCompact(c.loanAmount)} loan (EMI ${fmt(c.emi)}/mo)`
+            : `${fmtCompact(c.fvGoal)} needed`} · ${c.years} yr${c.years !== 1 ? 's' : ''} away · SIP ${isFinite(c.requiredMonthly) ? fmt(c.requiredMonthly) : '—'}/mo</div>
         </div>
       </div>`;
   }).join('') + `</div>`;

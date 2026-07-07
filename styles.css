@@ -1660,3 +1660,38 @@ tfoot td {
 }
 .home-dash-banner-title { font-weight: 700; font-size: .95rem; }
 .home-dash-banner-meta { color: var(--text-muted); font-size: .82rem; margin-top: 2px; }
+
+/* Goal financing (loan) section */
+.goal-loan-section { margin-top: 14px; }
+.goal-loan-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .88rem;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.goal-loan-toggle input { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+.goal-loan-panel {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: rgba(108,99,255,0.05);
+  border: 1px dashed rgba(108,99,255,0.35);
+  border-radius: var(--radius);
+}
+.goal-emi-preview {
+  margin-top: 12px;
+  font-size: .85rem;
+  color: var(--accent2);
+  background: rgba(0,212,170,0.07);
+  border: 1px solid rgba(0,212,170,0.25);
+  border-radius: 10px;
+  padding: 9px 12px;
+  line-height: 1.55;
+}
+.goal-emi-preview--warn {
+  color: var(--emi);
+  background: rgba(255,169,77,0.08);
+  border-color: rgba(255,169,77,0.35);
+}
