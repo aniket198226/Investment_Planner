@@ -893,6 +893,9 @@ function renderDashboard(monthlyMap, fileName) {
     monthlyInvestment: avg.investment,
   };
 
+  // A fresh statement supersedes any surplus derived from the previous one
+  syncGoalSurplusFromStatement();
+
   // Expose ways back to this analysis: nav link + home-page banner
   document.getElementById('nav-dashboard')?.classList.remove('hidden');
   const banner = document.getElementById('home-dashboard-banner');
@@ -2045,6 +2048,21 @@ function initGoals() {
       goals.filter(g => g.useLoan).forEach(g => refreshGoalLoanUI(g.id, true));
     });
   }
+}
+
+// Called whenever a new statement is analysed: overwrite the goals surplus
+// with the fresh numbers (any previous statement's value no longer applies),
+// re-check loan EMIs against it, and hide results computed on the old surplus.
+function syncGoalSurplusFromStatement() {
+  const el = document.getElementById('goals-surplus');
+  if (!el || !bankData) return;
+  const surplus = Math.max(0, Math.round(bankData.monthlyIncome - bankData.monthlyExpenses - bankData.monthlyEMI));
+  el.value = surplus ? fmtInput(surplus) : '';
+  const src = document.getElementById('goals-surplus-source');
+  if (src) src.textContent = '· updated from your latest bank statement';
+  saveGoalsLocal();
+  goals.filter(g => g.useLoan).forEach(g => refreshGoalLoanUI(g.id, true));
+  document.getElementById('goals-results')?.classList.add('hidden');
 }
 
 function prefillGoalSurplus() {
